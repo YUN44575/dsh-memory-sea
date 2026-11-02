@@ -2883,9 +2883,16 @@
     var i, n;
     for (i = 0; i < N; i++) NODES[i].bright = 0;
     if (cam.s >= DUST_UNTIL) {
+      // 放大到这一档就「全量点亮」。但一万颗星里大半在屏幕外——
+      // 它们照样要进 visList，然后被星尘层和亮星层各遍历一遍才发现画不着。
+      // 这里先按视口剔一遍（留 90px 边距，拖动时星星从边上长出来而不是跳出来）。
+      // 只在节点多的时候做：少于 1200 颗时全遍历本来就没几个钱，省得引入边界抖动。
+      var vpCut = N > 1200;
+      var MX0 = 90;
       for (i = 0; i < N; i++) {
         n = NODES[i];
         if (!n.vis) continue;
+        if (vpCut && (n.sx < -MX0 || n.sx > W + MX0 || n.sy < -MX0 || n.sy > H + MX0)) continue;
         n.bright = 1; n.rep = 1;
         visList.push(i);
       }

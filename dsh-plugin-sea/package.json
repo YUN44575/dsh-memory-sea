@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-plugin-sea",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "把 DSH 里的会话变成一片星图：每条交流一颗星，按来源分色、按时间回看，点开就是原话；可以搜索整理，也能让 AI 查自己的历史。",
   "private": true,
   "type": "module",

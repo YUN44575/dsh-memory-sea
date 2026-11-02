@@ -9,6 +9,7 @@ sea-build/out/bridge.js
 sea-build/out/version.js
 sea-build/out/zones.json
 sea-build/out/thumbs/
+sea-build/out/.collect-cache.json
 
 # 你的管理态（收藏 / 标签 / 备注 / 隐去 / 归档）—— 本地数据，不进仓库
 sea-build/marks.json

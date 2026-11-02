@@ -109,31 +109,12 @@ for (let i = 0; i < N; i++) {
 let totalTerms = 0; for (const v of vecs) totalTerms += v.size;
 console.log('avg terms/doc', (totalTerms / N).toFixed(0), '| vocab', dfs.size);
 
-// ---- 3. kNN（倒排累加余弦，跳过超高频词）----
-const K = 6;
-const edges = [];
-const scoreCap = new Map();
-for (let i = 0; i < N; i++) {
-  const v = vecs[i];
-  if (v.size === 0) continue;
-  const acc = new Map();
-  for (const [tk, w] of v) {
-    const arr = postings.get(tk);
-    if (!arr || arr.length > N * 0.25) continue;   // 太泛的词不参与检索
-    for (const j of arr) {
-      if (j === i) continue;
-      acc.set(j, (acc.get(j) || 0) + w * (vecs[j].get(tk) || 0));
-    }
-  }
-  const top = [...acc.entries()].sort((a, b) => b[1] - a[1]).slice(0, K);
-  for (const [j, s] of top) {
-    if (s <= 0.02) continue;
-    edges.push([i, j, s]);
-  }
-}
-console.log('knn edges', edges.length);
-const adj = Array.from({ length: N }, () => []);
-for (const [i, j, s] of edges) { adj[i].push([j, s]); adj[j].push([i, s]); }
+// ---- 3. （已移除）语义 kNN 图 ----
+// 这里原本用倒排索引累加余弦，给每个节点找 6 个语义近邻，产出 edges/adj。
+// 但实测：① 布局早就改成「kmeans 分岛 + 岛内时间螺旋」，根本不读这张图；
+// ② 前端画的关系线（payload.edges）是第 6 步用二维网格另算的，也跟它无关；
+// ③ 它却占了整个 layout 80% 的耗时（8.8 秒里的 6.8 秒，约 1300 万次 Map 操作）。
+// 所以整段删掉。删之前 grep 过：edges/adj 在 136 行之后再无引用。
 
 // ---- 4. t-SNE 降维（力导向会塌陷成均匀圆盘，t-SNE 才能真正分出语义簇）----
 const sessionIds = [...new Set(nodes.map((n) => n.sid))];
@@ -542,6 +523,36 @@ function layoutHubs(cen, rad, targetR, sp) {
   return { cx, cy };
 }
 
+// ---- 4d2. 增量模式：把上一次的坐标原样搬回来 ----
+// 全量布局要 8 秒多（其中 kNN 倒排累加就占 6.8 秒），但每天新长出来的通常只有几条。
+// 只要旧 data.js 能覆盖 90% 以上节点，就走增量：旧的星位置一点不动，新的星落在它的近邻中间。
+// 这样重跑一次是「几百毫秒 + 星图不跳」，而不是「八秒 + 每次全部重排」。
+const FORCE_FULL = process.argv.includes('--full');
+let OLD = null;
+if (!FORCE_FULL) {
+  try {
+    const raw = readFileSync(OUT, 'utf8');
+    const b = raw.indexOf('window.SEA=');
+    if (b >= 0) OLD = JSON.parse(raw.slice(b + 'window.SEA='.length).replace(/;\s*$/, ''));
+  } catch { /* 第一次跑，还没有旧数据 */ }
+}
+const oldById = new Map();
+if (OLD && Array.isArray(OLD.nodes)) for (const o of OLD.nodes) if (o && o.id) oldById.set(o.id, o);
+const idxOfId = new Map(nodes.map((n, i) => [n.id, i]));
+let reuseN = 0;
+const newIdx = [];
+for (let i = 0; i < N; i++) {
+  if (oldById.has(nodes[i].id)) reuseN++;
+  else newIdx.push(i);
+}
+// 旧数据超过 7 天就强制重排一次：增量只是把新星插到邻居中间，
+// 插久了会越来越糊，隔一段时间让整片海重新结一次晶。
+const OLD_AGE = Date.now() - (OLD && OLD.builtAt ? OLD.builtAt : 0);
+const INCR = !!OLD && Array.isArray(OLD.islands) && OLD.islands.length > 0
+  && OLD_AGE < 7 * 24 * 3600 * 1000
+  && reuseN >= N * 0.9 && newIdx.length <= Math.max(400, N * 0.25);
+if (INCR) console.log('增量布局：复用', reuseN, '颗旧星 | 新星', newIdx.length, '颗');
+else console.log('全量布局：', FORCE_FULL ? '--full 强制' : ('旧数据覆盖不足 ' + reuseN + '/' + N));
 // ---- 4e. 两片海各自建岛（唯一节点参与），岛内按时间卷成旋臂 ----
 const groups = [[], []];
 for (let i = 0; i < N; i++) if (DUP[i] < 0) groups[nodes[i].domain ? 1 : 0].push(i);
@@ -553,7 +564,64 @@ const SEP = 0.16 + 0.34 * Math.sqrt(cmpShare);
 const RAD = groups.map((g) => 0.30 + 0.38 * Math.sqrt(g.length / Math.max(1, uniq)));
 const ISLAND_K = [26, 11];
 const outIslands = [];
-for (let g = 0; g < 2; g++) {
+  if (INCR) {
+    // 增量：旧星坐标原样拿回来（已经是最终态，不用再走任何全局变换）
+    for (const o of OLD.nodes) {
+      const i = idxOfId.get(o.id);
+      if (i == null) continue;
+      yx[i] = o.x; yy[i] = o.y; zz[i] = o.z;
+    }
+    // 岛沿用旧位置（岛坐标在旧数据里已经是归一化后的真实值）
+    for (const isl of OLD.islands) outIslands.push({ x: isl.x, y: isl.y, r: isl.r, z: isl.z, n: isl.n || 0 });
+    const oldUniq = OLD.nodes.filter((o) => o.id && !o.dr && idxOfId.has(o.id));
+    // 新星落点：先找同会话时间最近的旧星（同一个会话本来就该挤在一起）；
+    // 找不到再按语义找 5 个最近的旧星取加权质心；都没有就丢在原点附近。
+    for (const i of newIdx) {
+      const n = nodes[i];
+      const mysid = sessIdx.get(n.sid);
+      let best = null, bestGap = Infinity;
+      for (const o of OLD.nodes) {
+        if (!o.id || o.sid !== mysid) continue;
+        const gap = Math.abs((o.t || 0) - (n.time || 0));
+        if (gap < bestGap) { bestGap = gap; best = o; }
+      }
+      let bx, by, bz;
+      if (best) { bx = best.x; by = best.y; bz = best.z; }
+      else {
+        const vi = vecs[i];
+        const cand = [];
+        for (const o of oldUniq) {
+          const vj = vecs[idxOfId.get(o.id)];
+          let sc = 0;
+          const small = vi.size <= vj.size ? vi : vj;
+          const big = small === vi ? vj : vi;
+          for (const [tk, w] of small) { const w2 = big.get(tk); if (w2) sc += w * w2; }
+          if (sc > 0.02) cand.push([o, sc]);
+        }
+        cand.sort((a, b) => b[1] - a[1]);
+        const top = cand.slice(0, 5);
+        if (top.length) {
+          let sw = 0, ax = 0, ay = 0, az = 0;
+          for (const [o, sc] of top) { sw += sc; ax += o.x * sc; ay += o.y * sc; az += o.z * sc; }
+          bx = ax / sw; by = ay / sw; bz = az / sw;
+        } else { bx = (rnd() - 0.5) * 0.12; by = (rnd() - 0.5) * 0.12; bz = (rnd() - 0.5) * 0.06; }
+      }
+      const jr = 0.004 + rnd() * 0.010;
+      const ja = rnd() * 6.283;
+      yx[i] = bx + Math.cos(ja) * jr;
+      yy[i] = by + Math.sin(ja) * jr;
+      zz[i] = bz + (rnd() - 0.5) * 0.010;
+      // 把新星归到最近的岛，岛的气就会跟着长
+      let ci = -1, cd = Infinity;
+      for (let q = 0; q < outIslands.length; q++) {
+        const isl = outIslands[q];
+        const d = Math.hypot(yx[i] - isl.x, yy[i] - isl.y);
+        if (d < cd) { cd = d; ci = q; }
+      }
+      if (ci >= 0) { outIslands[ci].n++; outIslands[ci].r = Math.max(outIslands[ci].r, cd * 1.05); }
+    }
+    console.log('  sea[增量] 岛', outIslands.length, '个 | 新星归位完毕');
+  } else for (let g = 0; g < 2; g++) {
   const idxs = groups[g];
   if (!idxs.length) continue;
   const K = Math.min(ISLAND_K[g], Math.floor(idxs.length / 3));
@@ -604,6 +672,7 @@ for (let i = 0; i < N; i++) {
 }
 const px = yx, py = yy, pz = zz;
 
+if (!INCR) {
 // ---- 4f. 整体归一化：按包围盒居中 + 缩放到单位圆（99 分位半径）----
 {
   let minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity;
@@ -720,6 +789,8 @@ const px = yx, py = yy, pz = zz;
     delete isl._m;
     delete isl._r0;
   }
+}
+
 }
 
 // ---- 5. 组装 data.js ----

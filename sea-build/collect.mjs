@@ -1,16 +1,22 @@
-// DSH 记忆意识海 · P0 采集器
-// 逐帧解压会话存档 → 归一化记忆节点 → sea-build/nodes.json
-import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
+/**
+ * 采集：把 .dsh 里的会话、长期记忆、世界日记读成 nodes.json。
+ *
+ * 增量：按会话文件缓存（mtime + size 指纹）。没有变化的文件直接复用上次的解析结果，
+ * 只重新解析新增/改动过的文件。`--full` 强制全量。
+ */
+import { readFileSync, readdirSync, statSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { zstdDecompressSync } from 'node:zlib';
-import { join } from 'node:path';
 import { loadPaths } from './paths.mjs';
 
-// 路径全部来自 paths.mjs（配置 > DSH_HOME > 自动探测），换台机器不用改代码
 const P = loadPaths();
 const SESSIONS = P.sessions;
 const OBJ = P.objects;
 const MEM_DIR = P.fishMemory;
 const OUT = P.nodes;
+const CACHE = join(P.out, '.collect-cache.json');
+const FORCE_FULL = process.argv.includes('--full');
+const CACHE_VER = 1;
 
 const MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
 
@@ -41,9 +47,9 @@ const KEEP = new Set(['user', 'qq', 'dsh-world-life', 'dsh-world-history', 'agen
 
 function cleanText(s) {
   return String(s || '')
-    .replace(/<path>[\s\S]*?<\/content>\n?/g, '')       // 附件描述块
-    .replace(/^\s*<[a-z-]+>[\s\S]*?<\/[a-z-]+>\s*$/g, '') // 纯标签块
-    .replace(/\r/g, '')
+    .replace(/<[^>\n]{1,40}>/g, ' ')
+    .replace(/\[\/?[a-zA-Z_][^\]\n]{0,40}\]/g, ' ')
+    .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -56,22 +62,33 @@ const nodes = [];
 const sessList = [];   // 所有会话的元数据（含一个节点都没有的空壳，供"隐藏层"清单用）
 const sysMap = new Map(); // 被挡在星图外的系统注入消息：按 source.kind 归类，只留计数与样本
 const procStat = { think: 0, tool: 0 }; // 过程层（思考 / 工具调用），只计数不入图
-const files = walk(SESSIONS);
-const stat = { files: files.length, sessions: 0, kept: 0, skippedEmpty: 0, truncated: 0, images: 0, missingImg: 0, memory: 0, diary: 0, sysKinds: 0, sysMsgs: 0 };
 
-for (const file of files) {
+// ── 缓存 ─────────────────────────────────────────────────────────
+const cache = (!FORCE_FULL && existsSync(CACHE))
+  ? (() => { try { const c = JSON.parse(readFileSync(CACHE, 'utf8')); return c && c.v === CACHE_VER && c.files ? c : { v: CACHE_VER, files: {} }; } catch { return { v: CACHE_VER, files: {} }; } })()
+  : { v: CACHE_VER, files: {} };
+const nextCache = { v: CACHE_VER, files: {} };
+
+const stat = {
+  files: 0, sessions: 0, kept: 0, skippedEmpty: 0, truncated: 0, images: 0, missingImg: 0,
+  memory: 0, diary: 0, sysKinds: 0, sysMsgs: 0,
+  cached: 0, parsed: 0,
+};
+
+// 解析一个会话文件，返回它自己产出的全部东西（可整体缓存）
+function collectSession(file) {
+  const out = { sess: null, nodes: [], sys: [], proc: { think: 0, tool: 0 }, trunc: 0, images: 0, skipped: 0, missingImg: 0 };
   let lines;
-  try { lines = decodeAll(file); } catch { continue; }
-  stat.sessions++;
+  try { lines = decodeAll(file); } catch { return out; }
   let sessionMeta = null, title = '';
   for (const l of lines) {
     let o; try { o = JSON.parse(l); } catch { continue; }
     if (o.type === 'session') sessionMeta = o;
     else if (o.type === 'session/title' && o.data?.title) title = o.data.title;
   }
-  if (!sessionMeta) continue;
+  if (!sessionMeta) return out;
   const sid = sessionMeta.id || file;
-  sessList.push({
+  out.sess = {
     id: sid,
     title: title || '',
     cwd: sessionMeta.cwd || '',
@@ -81,7 +98,10 @@ for (const file of files) {
     origin: sessionMeta.origin || '',
     preset: sessionMeta.agentPreset?.type || (typeof sessionMeta.agentPreset === 'string' ? sessionMeta.agentPreset : ''),
     lines: lines.length,
-  });
+  };
+
+  const sysMapLocal = new Map();
+  let inFile = 0;
 
   for (const l of lines) {
     const isAsst = l.includes('"type":"assistant/message"');
@@ -96,8 +116,8 @@ for (const file of files) {
       content = (d.message && d.message.content) || [];
       // 过程层只计数：让人知道"还有多少被折叠在详情里"，但绝不入图
       for (const c of content) {
-        if (c.type === 'reasoning') procStat.think++;
-        else if (c.type === 'tool-call') procStat.tool++;
+        if (c.type === 'reasoning') out.proc.think++;
+        else if (c.type === 'tool-call') out.proc.tool++;
       }
     } else {
       src = d.source?.kind || 'none';
@@ -105,8 +125,8 @@ for (const file of files) {
         // 系统注入类（时间/运行时上下文、插件规则、技能目录、审批流水…）
         // 它们的数量会反超真实对话，画成星就是噪音 —— 但"所有隐藏的都要能看到"，
         // 所以只留计数 + 几条样本，前端做"隐藏层"清单用。
-        let sy = sysMap.get(src);
-        if (!sy) { sy = { kind: src, n: 0, samples: [], all: [] }; sysMap.set(src, sy); }
+        let sy = sysMapLocal.get(src);
+        if (!sy) { sy = { kind: src, n: 0, samples: [], all: [] }; sysMapLocal.set(src, sy); }
         sy.n++;
         let st = '';
         for (const c of (d.content || [])) if (c.type === 'text') st += (st ? '\n' : '') + (c.text || '');
@@ -127,12 +147,12 @@ for (const file of files) {
       else if (c.type === 'image' && c.attachment) imgs.push(c.attachment);
     }
     text = cleanText(text);
-    if (!text && imgs.length === 0) { stat.skippedEmpty++; continue; }
+    if (!text && imgs.length === 0) { out.skipped++; continue; }
     // 超长文本通常是"把一整段聊天记录重新贴回来"，不是一条交流；
     // 但整条扔掉会连真正说的话一起丢，所以留头留尾、中间省略并标出来
     if (text.length > 4000) {
       text = text.slice(0, 2400) + '\n…（中间省略 ' + (text.length - 3600) + ' 字）…\n' + text.slice(-1200);
-      stat.truncated++;
+      out.trunc++;
     }
     if (!text && imgs.length) {
       // 纯图片消息：文本用文件名兜一下
@@ -142,12 +162,14 @@ for (const file of files) {
     for (const a of imgs) {
       const hex = String(a.attachmentId || '').replace(/^sha256:/, '');
       if (!hex) continue;
-      if (!existsSync(objPath(hex))) { stat.missingImg++; continue; }
+      if (!existsSync(objPath(hex))) { out.missingImg++; continue; }
       realImgs.push({ sha: hex, w: a.width || 0, h: a.height || 0, mt: a.mediaType || '', name: a.name || '' });
     }
-    stat.images += realImgs.length;
-    nodes.push({
-      id: sid + ':' + (o.seq ?? nodes.length),
+    out.images += realImgs.length;
+    out.nodes.push({
+      // 稳定身份：会话 id + 消息序号。所有消息都有 seq（实测 12915/12915），
+      // 所以这个 id 跨重跑不变 —— 管理态（收藏/标签）和增量布局都靠它。
+      id: sid + ':' + (o.seq ?? inFile++),
       kind: realImgs.length ? 'image' : 'text',
       src,
       sid,
@@ -161,9 +183,52 @@ for (const file of files) {
       // 协作通信的来处（哪个子代理/谁发来的），给详情面板标"这是谁说的"
       sender: src === 'agent-message' ? (d.source?.senderSessionId || '') : '',
     });
-    stat.kept++;
+  }
+  out.sys = [...sysMapLocal.values()];
+  return out;
+}
+
+function mergeSys(list) {
+  for (const s of list) {
+    let sy = sysMap.get(s.kind);
+    if (!sy) { sy = { kind: s.kind, n: 0, samples: [], all: [] }; sysMap.set(s.kind, sy); }
+    sy.n += s.n;
+    for (const smp of s.samples) if (sy.samples.length < 3) sy.samples.push(smp);
+    for (const a of s.all) sy.all.push(a);
   }
 }
+
+const files = walk(SESSIONS);
+stat.files = files.length;
+
+for (const file of files) {
+  const rel = relative(SESSIONS, file);
+  let st; try { st = statSync(file); } catch { continue; }
+  const sig = st.mtimeMs + ':' + st.size;
+  const hit = cache.files[rel];
+  let rec;
+  if (hit && hit.sig === sig && Array.isArray(hit.nodes)) {
+    rec = hit;
+    stat.cached++;
+  } else {
+    const c = collectSession(file);
+    rec = { sig, nodes: c.nodes, sys: c.sys, proc: c.proc, trunc: c.trunc, images: c.images, skipped: c.skipped, missingImg: c.missingImg, sess: c.sess };
+    stat.parsed++;
+  }
+  nextCache.files[rel] = rec;
+
+  stat.sessions++;
+  if (rec.sess) sessList.push(rec.sess);
+  if (rec.nodes.length) { for (const n of rec.nodes) nodes.push(n); stat.kept += rec.nodes.length; }
+  if (rec.sys) mergeSys(rec.sys);
+  if (rec.proc) { procStat.think += rec.proc.think || 0; procStat.tool += rec.proc.tool || 0; }
+  stat.truncated += rec.trunc || 0;
+  stat.images += rec.images || 0;
+  stat.skippedEmpty += rec.skipped || 0;
+  stat.missingImg += rec.missingImg || 0;
+}
+// 缓存里已经不存在/已被删掉的文件，条目丢掉，别让缓存越长越大
+// （nextCache 只收本次 walk 到的文件，天然就清掉了）
 
 // 长期记忆条目（fish-memory）
 if (existsSync(MEM_DIR)) {
@@ -246,6 +311,7 @@ if (existsSync(DIARY)) {
 // 世界的对话副本：worlds/conversations 是从 DSH 会话里抽出来的（每条都带 sourceSessionId +
 // sourceSeq，实测 201/218 能精确指回本地的某句话）。所以**不要**把它们当第二份数据上星，
 // 那只会让同一句话出现两次；只给对应节点打个标记，详情里说一句"这件事世界那边也记了一笔"。
+// 这个标记很小且每次都重算（<50ms），不进缓存，免得缓存里存一份过期的。
 const WCONV = join(P.worlds, 'conversations');
 if (existsSync(WCONV)) {
   const wMap = new Map();
@@ -276,7 +342,11 @@ const sessOut = sessList.map((s) => ({ ...s, nodes: cntOf.get(s.id) || 0 }));
 const sysOut = [...sysMap.values()].sort((a, b) => b.n - a.n);
 stat.sysKinds = sysOut.length;
 stat.sysMsgs = sysOut.reduce((a, b) => a + b.n, 0);
+
+try { mkdirSync(P.out, { recursive: true }); } catch {}
 writeFileSync(OUT, JSON.stringify({ builtAt: Date.now(), nodes, sessions: sessOut, sys: sysOut.map(({ all, ...r }) => r), proc: procStat }), 'utf8');
+try { writeFileSync(CACHE, JSON.stringify(nextCache), 'utf8'); } catch (e) { console.log('（缓存写入失败，下次会全量：' + e.message + '）'); }
+
 // 隐藏层全文（含每类全部消息，截 800 字）。总量好几 MB，不能塞进 data.js（每次打开都付这个钱），
 // 单独落一个 hidden.js，前端点「加载全文」时才 script 注入。
 const sysAll = [];
@@ -291,5 +361,6 @@ const tMin = nodes[0]?.time || 0, tMax = nodes[nodes.length - 1]?.time || 0;
 const parked = sessOut.filter((s) => s.nodes === 0).length;
 console.log(JSON.stringify(stat, null, 1));
 console.log('隐藏层:', sysOut.length, '类 |', sysOut.reduce((a, b) => a + b.n, 0), '条 | 过程层: 思考', procStat.think, '/ 工具', procStat.tool);
+console.log('增量:', stat.cached, '个文件用缓存 /', stat.parsed, '个重新解析');
 console.log('nodes:', nodes.length, '| 会话:', sessOut.length, '| 空壳会话:', parked, '| 时间跨度:', new Date(tMin).toISOString().slice(0, 10), '→', new Date(tMax).toISOString().slice(0, 10));
 console.log('out:', OUT);

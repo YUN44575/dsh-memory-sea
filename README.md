@@ -33,7 +33,7 @@
 
 ```bash
 node sea-build/doctor.mjs    # 先自检：找到几个数据源、缺什么
-node sea-build/setup.mjs     # 一条命令跑完整条管线（约 10 秒）
+node sea-build/setup.mjs     # 一条命令跑完整条管线（首次约 3 秒，之后约 2 秒）
 ```
 
 跑完 `sea-build/out/` 里会有 `index.html`、`data.js`、`zones.json` 等。
@@ -137,7 +137,7 @@ node sea-build/install.mjs --force          # 目录搬过家，覆盖旧的 lin
 
 ```bash
 node sea-build/doctor.mjs        # 自检：数据源在不在、产物新不新
-node sea-build/setup.mjs         # 更新数据（一条命令跑完整条管线）
+node sea-build/setup.mjs         # 更新数据（增量：只解析变过的会话文件，约 2 秒）
 node sea-build/synonym-test.mjs  # 同义词表自检：哪些说法搜不到
 node sea-build/watch.mjs         # 实时守护：会话一变就重建
 ```
@@ -161,7 +161,7 @@ dsh-sea-v1.0.0/
 └── sea-build/             ← 数据管线 + 界面
     ├── out/index.html     界面本体（星图 / 整理 / 详情，纯前端无依赖）
     ├── collect.mjs        采集会话 + 记忆卡 + 日记 → nodes.json
-    ├── layout.mjs         t-SNE 布局 → out/data.js + out/zones.json
+    ├── layout.mjs         语义分岛布局 → out/data.js + out/zones.json（增量：旧星不复位）
     ├── build_sc.mjs       SurfCore 记忆卡 → out/sc-data.js
     ├── match_bridge.mjs   两片海的重叠桥
     ├── setup.mjs          一条命令跑完上面四步
@@ -191,7 +191,8 @@ dsh-sea-v1.0.0/
 - **判重**按整段文本完全相同算，不认"意思一样但措辞不同"。
 - **分域**粒度是「会话」不是「话题」：工作会话里聊到陪聊对象的事，仍算工作海。
 - **AI 标星**页面最多 8 秒后出现（轮询版本号），不是即时的。
-- **数据量**：现在约 1600 节点 / 1 MB。到 5 万条需要改增量布局和分片（`layout.mjs` 现在一次算全量）。
+- **数据量**：现在约 1600 节点 / 1 MB。采集和布局都已是增量（只处理变过的会话、旧星坐标不动）；
+  到 5 万条主要瓶颈变成 `data.js` 单文件体积，需要按月分片。
 - 只在 Windows + Chrome 上验证过。
 
 ---
