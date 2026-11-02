@@ -13,9 +13,10 @@
  * ⚠ 改了本文件要**重启 DSH** 才生效（插件 host 半在进程启动时加载）；
  *   改 out/index.html、client.js 不用重启，浮层里点 ↻ 就行。
  */
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { promises as fsp } from 'node:fs';
 import { extname, join, normalize, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildIndex, search, explain } from './search.js';
 
 export const inject = ['webServer', 'tools'];
@@ -978,14 +979,20 @@ const readBody = (req, max = 8 * 1024 * 1024) =>
  * 数据目录（也就是 sea-build/out）解析顺序：
  *   1. config.root —— cordis.patch.yml 里写的
  *   2. 环境变量 SEA_DATA_DIR
- *   3. <用户目录>/.dsh/sea-out
- * 换机器只要改一处，不用动代码。
+ *   3. 插件自己旁边：<插件目录>/../sea-build/out（软链安装时这就是仓库里的产物目录）
+ *   4. <用户目录>/.dsh/sea-out
+ * 第 3 条是关键：`install.mjs` 用软链装时，装完什么都不用配就能找到数据。
  */
 function resolveRoot(configRoot) {
   const raw = String(configRoot || '').trim();
   if (raw) return normalize(raw);
   const env = String(process.env.SEA_DATA_DIR || '').trim();
   if (env) return normalize(env);
+  try {
+    const here = fileURLToPath(new URL('.', import.meta.url));
+    const guess = normalize(join(here, '..', 'sea-build', 'out'));
+    if (existsSync(join(guess, 'index.html'))) return guess;
+  } catch {}
   const home = process.env.USERPROFILE || process.env.HOME || '.';
   return normalize(join(home, '.dsh', 'sea-out'));
 }

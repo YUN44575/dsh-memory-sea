@@ -3,11 +3,12 @@
       name: '@local/dsh-plugin-sea'
       config:
         # 数据目录（就是 sea-build/out：里面有 index.html / data.js / nodes.json…）
-        # 三种写法，任选其一：
-        #   1. 直接写绝对路径（下面这行，本机已在用）
-        #   2. 留空 ''，然后用环境变量 SEA_DATA_DIR 指定
-        #   3. 留空且不设环境变量 → 默认 <用户目录>/.dsh/sea-out
-        # 换机器/换目录只改这里，不用动代码。
-        root: 'C:/Users/30390/Documents/deep seek harness/sea-build/out'
+        # 留空 = 自动找，顺序是：
+        #   1. 环境变量 SEA_DATA_DIR
+        #   2. 插件自己旁边：<插件目录>/../sea-build/out  ← 用 install.mjs 软链安装时就走这条，不用配
+        #   3. <用户目录>/.dsh/sea-out
+        # 想钉死位置就写绝对路径，比如：
+        #   root: 'D:/somewhere/sea-build/out'
+        root: ''
         # 挂在哪个 URL 前缀下；改这里要同步改 client.js 里的 iframe src
         prefix: '/sea'
