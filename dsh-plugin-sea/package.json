@@ -1,0 +1,41 @@
+{
+  "name": "@local/dsh-plugin-sea",
+  "version": "1.0.0",
+  "description": "把 DSH 里的会话变成一片星图：每条交流一颗星，按来源分色、按时间回看，点开就是原话；可以搜索整理，也能让 AI 查自己的历史。",
+  "private": true,
+  "type": "module",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "memory",
+    "visualization"
+  ],
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "search.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}

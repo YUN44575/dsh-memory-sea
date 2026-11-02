@@ -1,0 +1,39 @@
+{
+  "_说明": [
+    "「哪段会话属于陪伴海」的判定规则。layout.mjs 每次跑都会读这个文件，改完重跑 node sea-build/layout.mjs 生效（约 25 秒）。",
+    "优先级：overrides（点名指定） > byWorkspaceTitle（DSH 里你自己建的工作区分组） > byCwdContains（路径兜底） > default。",
+    "byWorkspaceTitle 是按「工作区成员」精确匹配的，不是按目录 —— 因为 QQ 聊天的目录 C:\\Users\\30390\\surfcore\\state\\agents 里同时住着插件自动建的排障会话，按目录分会把它们一起拉进陪伴海。",
+    "overrides 的 key 支持三种写法：完整 sid / 短 id（8 位）/ 短 id@标题片段。短 id 会撞车（两段 bili-whale 的开头都是 bili-wha），这时用 @ 标题片段区分，例如 \"bili-wha@统一人设卡\"。",
+    "byTitlePrefix：会话标题以这些前缀开头就判为某片海 —— 覆盖「人设注入开场」这类没有工作区、cwd 也看不出来的会话（［身份］/［统一人设卡/【当前时间】）。优先级在 byWorkspaceTitle 之后、byCwdContains 之前；判错了就在 overrides 里点名改回来（overrides 最高）。"
+  ],
+  "byWorkspaceTitle": {
+    "鲸鲸的房间": "companion",
+    "QQ 聊天": "companion"
+  },
+  "byCwdContains": [
+    {
+      "contains": ".dsh\\worlds\\",
+      "sea": "companion",
+      "why": "whale world (鲸鲸的家)"
+    }
+  ],
+  "overrides": {},
+  "default": "work",
+  "byTitlePrefix": [
+    {
+      "prefix": "［身份］",
+      "sea": "companion",
+      "why": "人设注入开场（［身份］）"
+    },
+    {
+      "prefix": "［统一人设卡",
+      "sea": "companion",
+      "why": "人设注入开场（统一人设卡）"
+    },
+    {
+      "prefix": "【当前时间】",
+      "sea": "companion",
+      "why": "陪伴心跳开场（【当前时间】）"
+    }
+  ]
+}

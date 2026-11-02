@@ -1,0 +1,13 @@
+- insert:
+    - id: dsh-plugin-sea
+      name: '@local/dsh-plugin-sea'
+      config:
+        # 数据目录（就是 sea-build/out：里面有 index.html / data.js / nodes.json…）
+        # 三种写法，任选其一：
+        #   1. 直接写绝对路径（下面这行，本机已在用）
+        #   2. 留空 ''，然后用环境变量 SEA_DATA_DIR 指定
+        #   3. 留空且不设环境变量 → 默认 <用户目录>/.dsh/sea-out
+        # 换机器/换目录只改这里，不用动代码。
+        root: 'C:/Users/30390/Documents/deep seek harness/sea-build/out'
+        # 挂在哪个 URL 前缀下；改这里要同步改 client.js 里的 iframe src
+        prefix: '/sea'

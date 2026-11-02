@@ -1,0 +1,24 @@
+# 管线产物（首次跑 `node sea-build/setup.mjs` 生成，不进仓库）
+sea-build/nodes.json
+sea-build/hashes.json
+sea-build/out/data.js
+sea-build/out/hidden.js
+sea-build/out/sc-data.js
+sea-build/out/sc-version.js
+sea-build/out/bridge.js
+sea-build/out/version.js
+sea-build/out/zones.json
+sea-build/out/thumbs/
+
+# 你的管理态（收藏 / 标签 / 备注 / 隐去 / 归档）—— 本地数据，不进仓库
+sea-build/marks.json
+
+# 本地覆盖配置
+sea-build/sea.config.local.json
+
+# 依赖与系统垃圾
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*

@@ -1,0 +1,9 @@
+# 统一行尾：文本用 LF，二进制不动
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
