@@ -30,6 +30,7 @@
 **工程**
 - 路径全部可配置（`paths.mjs`：配置 > DSH_HOME > 自动探测），不再写死用户名
 - `setup.mjs` 一条命令跑完整条管线（约 10 秒）
+- `install.mjs` 一条命令装插件：profile `package.json` 两处登记（`dependencies` 的 `link:` + `dsh.profile.bundles`）→ `node_modules/@local/` 建 junction 软链 → 跑 setup；改前自动备份 `.bak-sea-<时间戳>`
 - `doctor.mjs` 自检
 - `sea.config.json` 暴露同义词/权重/检索参数
 - 管理态从 localStorage 迁到 `marks.json` 文件（file:// 与 http:// 共用一份），键从下标改成稳定 id

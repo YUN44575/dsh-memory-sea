@@ -39,27 +39,50 @@ node sea-build/setup.mjs     # 一条命令跑完整条管线（约 10 秒）
 跑完 `sea-build/out/` 里会有 `index.html`、`data.js`、`zones.json` 等。
 **先双击 `sea-build/out/index.html` 看看**——这一步不需要装插件，是纯静态页面。
 
-### 3. 装插件
+### 3. 装插件（一条命令）
 
-把 `dsh-plugin-sea/` 整个复制到（或软链到）DSH 的 profile 下：
-
-```
-<用户目录>/.dsh/profiles/<profile名>/node_modules/@local/dsh-plugin-sea
+```bash
+node sea-build/install.mjs
 ```
 
-然后在 DSH 的 bundle patch 里插一条（或直接改 `dsh-plugin-sea/cordis.patch.yml`）：
+它会做三件事：往 DSH profile 的 `package.json` 里登记两处（`dependencies` 加一条 `link:`、
+`dsh.profile.bundles` 加一项）、把 `dsh-plugin-sea/` 软链到 `node_modules/@local/` 下、
+再顺手跑一遍数据生成。**改之前会备份** `.bak-sea-<时间戳>`。
 
-```yaml
-- insert:
-    - id: dsh-plugin-sea
-      name: '@local/dsh-plugin-sea'
-      config:
-        root: '<上面那个目录>/sea-build/out'
-        prefix: '/sea'
+```bash
+node sea-build/install.mjs --dry            # 只看会改什么，不动文件
+node sea-build/install.mjs --profile web    # 换 profile（默认 desktop）
+node sea-build/install.mjs --copy           # 复制而不是软链（想冻结版本时用）
+node sea-build/install.mjs --skip-setup     # 只装插件，不重建数据
+node sea-build/install.mjs --force          # 目录搬过家，覆盖旧的 link 指向
 ```
 
-`root` 有三种写法：
-1. 直接写绝对路径（最直白）
+装完在 profile 目录跑一次 `pnpm install`（如果 DSH 启动时自己会装，跳过也行）。
+
+<details>
+<summary>也可以手动装（两处登记）</summary>
+
+改 `<用户目录>/.dsh/profiles/<profile名>/package.json`：
+
+```jsonc
+{
+  "dependencies": {
+    "@local/dsh-plugin-sea": "link:<本仓库>/dsh-plugin-sea"   // ← 第 1 处
+  },
+  "dsh": {
+    "profile": {
+      "bundles": ["…", "@local/dsh-plugin-sea"]                // ← 第 2 处
+    }
+  }
+}
+```
+
+再把 `dsh-plugin-sea/` 软链到 `<profile>/node_modules/@local/dsh-plugin-sea`，然后 `pnpm install`。
+
+</details>
+
+插件的数据目录（`root`）有三种写法：
+1. 在 `dsh-plugin-sea/cordis.patch.yml` 里写绝对路径（最直白）
 2. 留空 `''`，用环境变量 `SEA_DATA_DIR` 指定
 3. 留空且不设环境变量 → 默认 `<用户目录>/.dsh/sea-out`
 
