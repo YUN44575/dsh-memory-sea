@@ -530,8 +530,30 @@
   .dxs { font-size: 9.5px; color: var(--dim); letter-spacing: .04em; }
   .dxs b { color: var(--mid); font-weight: normal; }
   .dxt { font-size: 11.5px; color: var(--mid); line-height: 1.55; }
-  #drel { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 16px; }
-  #drel .t { font-size: 10px; letter-spacing: .22em; color: var(--dim); margin-bottom: 12px; }
+  #drel { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 14px; }
+  #drel .t { font-size: 10px; letter-spacing: .22em; color: var(--dim); margin-bottom: 10px; }
+  /* 前后几条：一眼看出顺序和自己在哪。当前这条用左侧竖线 + 亮字标出来，
+     上下各露两条，再远只报"还有几条"，不再一次列一长串。 */
+  #drel .thr {
+    display: flex; gap: 9px; align-items: baseline; padding: 6px 0 6px 10px;
+    border-left: 2px solid transparent; border-radius: 0 5px 5px 0; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  #drel .thr:hover { background: rgba(120, 180, 240, .08); border-left-color: rgba(140, 200, 255, .45); }
+  #drel .thr.cur { border-left-color: #7fdcff; background: rgba(120, 200, 255, .07); cursor: default; }
+  #drel .thr .tk { flex: none; width: 36px; font-size: 10px; letter-spacing: .06em; color: var(--dim); }
+  #drel .thr.cur .tk { color: #9fd8ff; }
+  #drel .thr .tt {
+    font-size: 12px; line-height: 1.6; color: #aec6dc; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #drel .thr.cur .tt { color: #e8f4ff; }
+  #drel .thrmore { font-size: 10.5px; color: var(--dim); padding: 5px 0 5px 10px; opacity: .8; }
+  body[data-theme="shallow"] #drel .thr:hover { background: rgba(180, 130, 80, .09); border-left-color: rgba(190, 140, 90, .45); }
+  body[data-theme="shallow"] #drel .thr.cur { border-left-color: #c98a4e; background: rgba(200, 150, 90, .08); }
+  body[data-theme="shallow"] #drel .thr.cur .tk { color: #b87333; }
+  body[data-theme="shallow"] #drel .thr .tt { color: #6f5b48; }
+  body[data-theme="shallow"] #drel .thr.cur .tt { color: #3f2f22; }
   .rel { display: flex; gap: 10px; padding: 7px; border-radius: 8px; cursor: pointer; transition: background .2s; }
   .rel:hover { background: rgba(127, 220, 255, .08); }
   .rel img, .rel .ph {
@@ -1093,6 +1115,16 @@
     <div id="dmeta"></div>
     <div id="dreveal" style="display:none"></div>
     <div id="dtext"></div>
+    <!-- 「前后关系」和「相关话语」紧跟在正文后面：它们是最常被要看的两样，
+         原来排在标签、备注下面，正文一长就得滚很久才能看到。 -->
+    <div id="drel" style="display:none">
+      <div class="t" id="dreltitle">这段对话里，前后几条</div>
+      <div id="drelist"></div>
+    </div>
+    <div id="dxrel" style="display:none">
+      <div class="t">这件事，别处也提过</div>
+      <div id="dxlist"></div>
+    </div>
     <div id="dtags"></div>
     <div id="dtagWrap">
       <div class="tagt">标签 <span class="tiph">回车确认 · 点自动词可以收成标签</span></div>
@@ -1102,14 +1134,6 @@
     <div id="dnoteWrap">
       <textarea id="dnote" rows="2" placeholder="写一句备忘，只存在你自己的浏览器里…"></textarea>
       <div class="nfoot"><span id="dnoteState"></span><span class="hintk">⌘/Ctrl + Enter 保存</span></div>
-    </div>
-    <div id="dxrel" style="display:none">
-      <div class="t">这件事，别处也提过</div>
-      <div id="dxlist"></div>
-    </div>
-    <div id="drel" style="display:none">
-      <div class="t">这段对话里，前后几条</div>
-      <div id="drelist"></div>
     </div>
   </div>
 </aside>
@@ -4880,37 +4904,36 @@
       tg.appendChild(sp);
     });
 
-    // 同会话近邻
+    // 「这段对话」：按时间排好的同一段对话，当前这条标出来，上下各露 2 条。
+    // 原来的做法是"取 4 条相关的"，没有前后感；现在直接给顺序和位置。
     var list = nodesBySid[n.sid] || [];
     var pos = list.indexOf(idx);
-    var rel = [];
-    for (var k = -2; k <= 2; k++) {
-      if (!k) continue;
-      var q = list[pos + k];
-      if (q == null) continue;
-      rel.push(q);
-    }
     var relBox = document.getElementById('drel');
     var relList = document.getElementById('drelist');
+    var relTitle = document.getElementById('dreltitle');
     relList.innerHTML = '';
-    if (rel.length) {
+    if (list.length > 1 && pos >= 0) {
       relBox.style.display = 'block';
-      rel.slice(0, 4).forEach(function (q) {
-        var m = NODES[q];
-        var d = document.createElement('div');
-        // 没有缩略图就别摆一块空灰方块（看起来像加载失败）
-        d.className = 'rel' + (m.th ? '' : ' nothumb');
-        if (m.th) {
-          var im2 = document.createElement('img');
-          im2.src = thumbURL(m.th); im2.loading = 'lazy';
-          d.appendChild(im2);
-        }
-        var tdiv = document.createElement('div');
-        tdiv.className = 'rt';
-        tdiv.textContent = (m.txt || '（无文字）').replace(/\s+/g, ' ').slice(0, 80);
-        d.appendChild(tdiv);
-        d.onclick = function () { selectNode(q); flyTo(m); };
-        relList.appendChild(d);
+      relTitle.textContent = '这段对话 · 第 ' + (pos + 1) + ' / ' + list.length + ' 条';
+      var _h = '';
+      var _from = Math.max(0, pos - 2), _to = Math.min(list.length - 1, pos + 2);
+      if (_from > 0) _h += '<div class="thrmore">↑ 前面还有 ' + _from + ' 条</div>';
+      for (var _k = _from; _k <= _to; _k++) {
+        var _qi = list[_k], _m = NODES[_qi];
+        var _cur = _k === pos;
+        var _tag = _cur ? '当前' : (_k < pos ? '前 ' + (pos - _k) : '后 ' + (_k - pos));
+        _h += '<div class="thr' + (_cur ? ' cur' : '') + '"' + (_cur ? '' : ' data-thr="' + _qi + '"') + '>' +
+          '<span class="tk">' + _tag + '</span>' +
+          '<span class="tt">' + esc((_m.txt || '（无文字）').replace(/\s+/g, ' ').slice(0, 64)) + '</span>' +
+          '</div>';
+      }
+      if (_to < list.length - 1) _h += '<div class="thrmore">↓ 后面还有 ' + (list.length - 1 - _to) + ' 条</div>';
+      relList.innerHTML = _h;
+      Array.prototype.forEach.call(relList.querySelectorAll('[data-thr]'), function (el) {
+        el.onclick = function () {
+          var _t = Number(el.getAttribute('data-thr'));
+          selectNode(_t); flyTo(NODES[_t]);
+        };
       });
     } else { relBox.style.display = 'none'; }
 
