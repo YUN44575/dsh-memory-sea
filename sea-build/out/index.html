@@ -918,6 +918,9 @@
   .mgfilter i:hover{color:#ffb0b0;border-color:#5a2c2c;background:#22121a}
   .mghint{font-size:11px;color:#5c80a0;padding:9px 20px 0}
   .mghint b{font-weight:normal;color:#8fb9dd}
+  /* 三个 tab 各一句话：新人不用挨个点开才发现「体检」「回顾」是干什么的 */
+  .mghint2{font-size:11.5px;color:#5c80a0;line-height:1.6;padding:0 0 10px;min-height:18px}
+  .mghint2 b{font-weight:normal;color:#8fb9dd}
   /* 回顾 */
   .rvwrap{padding:14px 20px 40px;max-width:1120px;margin:0 auto}
   .rvbar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
@@ -1054,6 +1057,7 @@
     <label class="mgck"><input type="checkbox" id="mgstar"> 只看收藏</label>
     <label class="mgck"><input type="checkbox" id="mghide"> 看隐去的</label>
   </div>
+  <div class="mghint2" id="mgtabhint"></div>
   <div class="mgfilter" id="mgfilter"></div>
   <div class="mgb" id="mgbody"></div>
   <div class="mgf" id="mgfoot"></div>
@@ -5936,7 +5940,10 @@
       var layerName = layerWord(TH.layer === 'deep');
       var zoneName = zoneFilter < 0 ? '' : (zoneFilter === 1 ? ' · 陪伴' : ' · 工作');
       // 对刚用的人，「意识流」这名字太玄：钉一行小字解释它是什么
-      hd.innerHTML = '<span>' + (dataSrc === 'sc' ? '她的记忆' : '意识流') + ' · ' + layerName + zoneName
+      var layerTip = TH.layer === 'deep'
+        ? '近岸 = 最近这几天的记忆；点右上「近岸」可以切到远洋（更早的）'
+        : '远洋 = 更早的记忆；点右上「近岸」可以切回近岸（最近几天的）';
+      hd.innerHTML = '<span title="' + layerTip + '">' + (dataSrc === 'sc' ? '她的记忆' : '意识流') + ' · ' + layerName + zoneName
         + '<i class="sh2">= 一段对话</i></span>'
         + (activeSid >= 0
           ? '<span id="quitstream" title="退出这一段（Esc）">✕ 退出</span>'
@@ -6502,6 +6509,14 @@
     var cnt = document.getElementById('mgcount');
     if (!body) return;
 
+    var _th = document.getElementById('mgtabhint');
+    if (_th) {
+      _th.innerHTML = mgTab === 'health'
+        ? '把这批记忆的状态摊成数字：多少条、多少重复、哪句说过就再没提过。<b>点任意一张卡</b>，看它包含哪些记忆。'
+        : mgTab === 'review'
+          ? '选一段时间，出一张那几天的卡：每天多少条、哪句再没提过、发过哪些图。<b>点卡片里的条目</b>能跳回星图那颗星。'
+          : '这是同一批记忆的另一种看法：一行一条，能搜、能筛、能批量收藏 / 隐去 / 打标签。星图上不好动手的事在这里做。';
+    }
     // tab 高亮
     var tabs = document.querySelectorAll('.mgtab');
     for (var t = 0; t < tabs.length; t++) tabs[t].classList.toggle('on', tabs[t].getAttribute('data-mgtab') === mgTab);
