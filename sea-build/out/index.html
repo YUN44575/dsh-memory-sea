@@ -3746,25 +3746,34 @@
       }
       ctx.fillStyle = theme === 'deep' ? 'rgba(176,220,255,.86)' : 'rgba(132,120,206,.82)';
       ctx.fill();
-      // 上面只画了最近的几条当"指针"。光标停在任意一颗相关星上时，
+      // 上面只画了最近的几条当"指针"。光标停在近处的相关星上时，
       // 再把「选中星 → 这一颗」单独点亮一条：想看哪条看哪条，不用一堆线互相打。
+      // 限定 320px 是有原因的：一旦允许横跨整个屏幕，那条线就成了用户眼里的
+      // "一条不明长条"，比原来的 16 根线还难懂 —— 远处的相关星靠光晕和右侧列表表达。
       if (hoverIdx >= 0 && hoverIdx !== selIdx && relatedSet.has(hoverIdx) && NODES[hoverIdx].vis) {
         var hn = NODES[hoverIdx];
-        var isSameSess = hn.sid === sn.sid;
-        ctx.beginPath();
-        ctx.moveTo(sn.sx, sn.sy);
-        ctx.lineTo(hn.sx, hn.sy);
-        ctx.strokeStyle = isSameSess
-          ? (theme === 'deep' ? 'rgba(255,208,150,.90)' : 'rgba(226,158,92,.86)')
-          : (theme === 'deep' ? 'rgba(176,220,255,.86)' : 'rgba(132,120,206,.84)');
-        ctx.lineWidth = 1.6;
-        ctx.stroke();
-        ctx.beginPath();
-        var hpR = 3.2 + (hn.hi === 1 ? 0.8 : 0);
-        ctx.moveTo(hn.sx + hpR, hn.sy);
-        ctx.arc(hn.sx, hn.sy, hpR, 0, 6.2832);
-        ctx.fillStyle = isSameSess ? 'rgba(255,214,158,.96)' : 'rgba(190,228,255,.94)';
-        ctx.fill();
+        var hdx = hn.sx - sn.sx, hdy = hn.sy - sn.sy;
+        if (hdx * hdx + hdy * hdy <= 320 * 320) {
+          var isSameSess = hn.sid === sn.sid;
+          ctx.beginPath();
+          ctx.moveTo(sn.sx, sn.sy);
+          ctx.lineTo(hn.sx, hn.sy);
+          // 虚线 + 淡一档：它是"临时指路"，不该跟常驻短线抢注意力
+          ctx.save();
+          ctx.setLineDash([5, 4]);
+          ctx.strokeStyle = isSameSess
+            ? (theme === 'deep' ? 'rgba(255,208,150,.62)' : 'rgba(226,158,92,.60)')
+            : (theme === 'deep' ? 'rgba(176,220,255,.58)' : 'rgba(132,120,206,.58)');
+          ctx.lineWidth = 1.15;
+          ctx.stroke();
+          ctx.restore();
+          ctx.beginPath();
+          var hpR = 3.2 + (hn.hi === 1 ? 0.8 : 0);
+          ctx.moveTo(hn.sx + hpR, hn.sy);
+          ctx.arc(hn.sx, hn.sy, hpR, 0, 6.2832);
+          ctx.fillStyle = isSameSess ? 'rgba(255,214,158,.96)' : 'rgba(190,228,255,.94)';
+          ctx.fill();
+        }
       }
       // 关系在流动：每条线上跑一颗小光点，方向是「选中星 → 相关星」。
       // 静止的细线只说明"有关系"，会动的点才说明"从它流向哪"。
@@ -4549,6 +4558,24 @@
   var tipIdx = -1;
 
   function hideTip() { tipEl.classList.remove('show'); tipIdx = -1; }
+
+  // 鼠标从星图上移到任何一块面板上时，画布这边收不到 mousemove（事件被面板接走了），
+  // 悬停卡就僵在原地、正好挡住面板内容；悬停星的高亮也会一直留着。
+  // 所以面板自己负责报"鼠标进来了"。
+  (function () {
+    ['detail', 'mgmt', 'shelf', 'srcpanel', 'today', 'review', 'bulk'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('mouseenter', function () {
+        hideTip();
+        if (hoverIdx >= 0) {
+          var pn = NODES[hoverIdx];
+          if (pn) pn.hlTarget = 0;
+          hoverIdx = -1;
+        }
+      });
+    });
+  })();
 
   function kindName(k) { return k === 'image' ? '图像' : k === 'memory' ? '长期记忆' : '话语'; }
   function fmtDate(t) {
