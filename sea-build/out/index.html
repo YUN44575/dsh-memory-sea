@@ -208,7 +208,14 @@
   /* 展开时改用绝对定位：左边贴 padding、右边停在面板左沿，宽度自动算，
      不必再跟 flex 的 basis/gap 斤斤计较；放第二行，避开搜索框。 */
   body.panel-open #tools.open { right: calc(min(396px, 32vw) + 20px); }
-  body.panel-open #detail { top: 62px; }
+  /* 面板打开时给顶栏的按钮组和底部时间轴让位：
+     以前它是 right:0/top:0/bottom:0 顶满整列，右上角「来源/收藏/近岸/整理」正好被压在下面，
+     想切来源得先关详情 —— 那种「点不下去」的卡手就是这儿来的。 */
+  body.panel-open #detail,
+  body.panel-open #results { top: 72px; bottom: 78px; }
+  body.panel-open #detail.open,
+  body.panel-open #results.open { border-radius: 12px 0 0 12px; }
+  body.panel-open #detail::before { top: var(--anchor, 180px); }
   .btn {
     height: 34px; padding: 0 14px; display: inline-flex; align-items: center; gap: 7px;
     background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
@@ -3880,7 +3887,8 @@
       }
 
       // 缩略图模式
-      if (imgLOD && n.th && focus > 0.3
+      // 一屏最多画 26 张缩略图卡：再多也不是「看得清」，只会把帧数拖下去
+      if (imgLOD && n.th && focus > 0.3 && lodRects.length < 26
           && Math.hypot(sx - lodCX, sy - lodCY) < lodR) {
         var th = getThumb(n.th);
         if (th && th.ready) {
@@ -3912,7 +3920,8 @@
           ctx.shadowColor = theme === 'deep'
             ? hexA(n.zone ? TH.cmp.image : TH.node.image, 0.75 * focus * thFade)
             : 'rgba(28,66,96,' + (0.30 * focus * thFade).toFixed(3) + ')';
-          ctx.shadowBlur = (theme === 'deep' ? 16 : 9) * thFade;
+          // 卡少的时候用柔光；一多就关掉 —— 每张卡各算一次高斯模糊，是这里最大的一笔开销
+          ctx.shadowBlur = (lodRects.length <= 12) ? (theme === 'deep' ? 16 : 9) * thFade : 0;
           roundRect(ctx, sx - tw0 / 2, sy - th0 / 2, tw0, th0, 4);
           ctx.clip();
           ctx.drawImage(th.img, sx - tw0 / 2, sy - th0 / 2, tw0, th0);
@@ -3941,7 +3950,9 @@
       // 光晕能让「相关的那一族」整片亮起来，而且不织成一张网。
       if (selIdx >= 0 && relatedSet && relatedSet.has(d) && !imgLOD) {
         var relD = Math.hypot(sx - NODES[selIdx].sx, sy - NODES[selIdx].sy);
-        var relK = Math.max(0, 1 - relD / 560);
+        // 只画近处那一圈：relatedSet 可能有几百颗（同会话 + 语义 + 回声扩散），
+        // 全给光晕等于每帧多几百次贴图，点星时那一下顿就是它
+        var relK = relD < 340 ? Math.max(0, 1 - relD / 340) : 0;
         // 相关星不是"啪一下全亮"，而是从近到远一颗接一颗亮起来（每组错开 ~26ms）
         var relIn = Math.min(1, Math.max(0, (performance.now() - selT0 - (n.relDelay || 0)) / 220));
         if (relK > 0.02 && relIn > 0) {
@@ -4083,7 +4094,9 @@
       var px0 = W - (window.innerWidth <= 760 ? 0 : 396);
       var lx0 = ln.sx, ly0 = ln.sy;
       // 面板左边缘的尖角跟着这颗星走：一眼看出「这块面板说的是哪一颗」
-      var anchorY = Math.max(96, Math.min(H - 96, ly0));
+      // 面板现在从 72px 开始（给顶栏让位），尖角用的是面板内坐标，要换算一下
+      var anchorY = Math.max(96, Math.min(H - 96, ly0)) - 72;
+      anchorY = Math.max(20, Math.min(H - 72 - 78 - 30, anchorY));
       if (Math.abs(anchorY - lastAnchorY) > 1.5) {
         lastAnchorY = anchorY;
         var dl = document.getElementById('detail');
@@ -4861,30 +4874,34 @@
     var lg0 = document.getElementById('legend');
     if (lg0) lg0.classList.add('hide');
     document.getElementById('hint').classList.add('out');
-    // 只留相关的记忆（同会话 + 语义相近），其余隐去
-    relatedSet = computeRelated(idx);
-    // 相关星按离选中星的远近排队，越近越先亮 —— 像光从这颗星散出去
-    {
-      var _sn = NODES[idx];
-      var _q = [];
-      relatedSet.forEach(function (d) {
-        if (d === idx) return;
-        var _dn = NODES[d];
-        _q.push([Math.hypot((_dn.sx || 0) - (_sn.sx || 0), (_dn.sy || 0) - (_sn.sy || 0)), d]);
-      });
-      _q.sort(function (a, b) { return a[0] - b[0]; });
-      for (var _i = 0; _i < _q.length; _i++) {
-        NODES[_q[_i][1]].relDelay = Math.min(320, _i * 26);
+    // 点一下先让详情出来 —— 关联计算（computeRelated + buildEcho + 跨会话）慢，
+    // 放到下一帧做，体感从"点了等一下"变成"点了就有"。
+    requestAnimationFrame(function () {
+      // 只留相关的记忆（同会话 + 语义相近），其余隐去
+      relatedSet = computeRelated(idx);
+      // 相关星按离选中星的远近排队，越近越先亮 —— 像光从这颗星散出去
+      {
+        var _sn = NODES[idx];
+        var _q = [];
+        relatedSet.forEach(function (d) {
+          if (d === idx) return;
+          var _dn = NODES[d];
+          _q.push([Math.hypot((_dn.sx || 0) - (_sn.sx || 0), (_dn.sy || 0) - (_sn.sy || 0)), d]);
+        });
+        _q.sort(function (a, b) { return a[0] - b[0]; });
+        for (var _i = 0; _i < _q.length; _i++) {
+          NODES[_q[_i][1]].relDelay = Math.min(320, _i * 26);
+        }
+        // 只有最近这 8 颗套光圈。以前是按"屏幕距离 relK > 0.55"判断，
+        // 放大以后 250px 能圈进几十颗，点一下冒出一片圆环 —— 割裂感就是这么来的。
+        relRingSet = {};
+        for (var _r = 0; _r < Math.min(8, _q.length); _r++) relRingSet[_q[_r][1]] = 1;
       }
-      // 只有最近这 8 颗套光圈。以前是按"屏幕距离 relK > 0.55"判断，
-      // 放大以后 250px 能圈进几十颗，点一下冒出一片圆环 —— 割裂感就是这么来的。
-      relRingSet = {};
-      for (var _r = 0; _r < Math.min(8, _q.length); _r++) relRingSet[_q[_r][1]] = 1;
-    }
-    buildEcho(idx);
-    for (var ei = 0; ei < N; ei++) if (echoDist[ei] >= 0) relatedSet.add(ei);
-    renderCrossRel(idx);
-    refreshFilter();
+      buildEcho(idx);
+      for (var ei = 0; ei < N; ei++) if (echoDist[ei] >= 0) relatedSet.add(ei);
+      renderCrossRel(idx);
+      refreshFilter();
+    });
     if (!rapid) focusOn(idx);
     else if (cam.s > 2.2) {
       // 已经推到近处了：连点时只轻轻把星挪到画面中间，不重设缩放/角度
@@ -6182,6 +6199,8 @@
   function mgSrcName(k) { return (typeof srcName === 'function' ? srcName(k) : k) || k; }
 
   function openMgmt(tab) {
+    // 整理是全屏层，详情面板留在下面会变成「关了整理又冒出一块」的错觉
+    try { closeDetail(); } catch (e) {}
     mgFilter = '';
     var hv0 = document.getElementById('mghide');
     if (hv0) hv0.checked = false;
