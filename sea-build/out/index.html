@@ -53,6 +53,8 @@
   #ringNote.folded { max-height: none; overflow: visible; }
   /* 详情面板一开，说明卡就让位——它俩都在右侧，会叠在一起 */
   body.panel-open #ringNote { display: none; }
+  /* 浮层里图例在 152px 起，便签要落在它上面 */
+  body.embed #ringNote { bottom: 238px; }
   #ringNote .rh {
     font-size: 13px; letter-spacing: .16em; color: var(--fg);
     margin-bottom: 9px; cursor: pointer; display: flex; align-items: center; gap: 8px;
@@ -669,6 +671,8 @@
   /* 在插件浮层里（?embed=1）右下角是外层的控制条「↻ / ← 回到 DSH」，
      图例原来 bottom:88px 正好压在它上面 —— 往上让一格 */
   body.embed #legend { bottom: 152px; }
+  /* 年轮模式下右下角要放「怎么看」便签，图例让开——两个都在右下，硬挤总有一档会重叠 */
+  body.ring-mode #legend { opacity: 0; pointer-events: none; }
   body[data-theme="shallow"] #legend {
     background: rgba(252, 248, 242, .7); border-color: rgba(160, 120, 80, .3); color: #7a6350;
   }
@@ -1550,6 +1554,7 @@
     if (b) b.classList.toggle('on', ringMode);
     var note = document.getElementById('ringNote');
     if (note) note.classList.toggle('on', ringMode);
+    document.body.classList.toggle('ring-mode', ringMode);
     closeDetail();
     ringSpan();
     if (ringMode) {
