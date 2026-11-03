@@ -205,7 +205,9 @@ function makeDataReader(root) {
     return surf;
   }
 
-  return { load, loadSysAll, loadIndex, loadConfig, loadSurf };
+  // 别人装完常常是「打开了但一片空」：把要跑的命令算成完整一行，前端/工具直接给用户复制
+  const setupCmd = () => 'cd "' + normalize(join(root, '..', '..')) + '" && node sea-build/setup.mjs';
+  return { load, loadSysAll, loadIndex, loadConfig, loadSurf, setupCmd };
 }
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -898,7 +900,7 @@ function makeTools(reader, caps = {}, marks = null) {
           ok: false,
           message:
             (miss ? '记忆数据还没生成' : '读记忆的时候出错了') +
-            '（' + msg.slice(0, 120) + '）。先在项目目录跑 node sea-build/setup.mjs。',
+            '（' + msg.slice(0, 120) + '）。\n先跑一次：\n' + reader.setupCmd(),
         };
       }
     },
@@ -1090,9 +1092,10 @@ export async function apply(ctx, config) {
           proc: d.proc,
           file: d.file,
           caps,
+          setupCmd: reader.setupCmd(),
         });
       } catch (e) {
-        sendJson(res, 503, { ok: false, message: String(e?.message || e) });
+        sendJson(res, 503, { ok: false, message: String(e?.message || e), setupCmd: reader.setupCmd() });
       }
       return;
     }
