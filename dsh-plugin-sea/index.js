@@ -1189,7 +1189,11 @@ export async function apply(ctx, config) {
         try {
           let html = await fsp.readFile(file, 'utf8');
           const cmd = reader.setupCmd();
-          const escHtml = String(cmd).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+          // 这段会被塞进 index.html 的 **JS 字符串字面量**里（boot0.innerHTML = '...' + '...'）。          // 反斜杠必须再转义一层：Windows 路径里的 `\3`（C:\Users\30390）在 JS 里是八进制转义，
+          // strict mode 下直接 SyntaxError，整个内联脚本不执行 → 页面卡在「正在铺开星图」。
+          const escHtml = String(cmd)
+            .replace(/\\/g, '\\\\')
+            .replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
           html = html.split('<code id="bootcmd">node sea-build/setup.mjs</code>')
             .join('<code id="bootcmd">' + escHtml + '</code>');
           res.setHeader('Content-Length', Buffer.byteLength(html));
