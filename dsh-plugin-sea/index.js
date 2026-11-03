@@ -1140,6 +1140,24 @@ export async function apply(ctx, config) {
         res.end();
         return;
       }
+
+      // 首页直接把「装完要跑的那条命令」写进去：
+      // 前端是 fetch /api/status 再填的，有延迟、失败还静默，别人看到的会是半截命令。
+      if (rel === 'index.html') {
+        try {
+          let html = await fsp.readFile(file, 'utf8');
+          const cmd = reader.setupCmd();
+          const escHtml = String(cmd).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+          html = html.split('<code id="bootcmd">node sea-build/setup.mjs</code>')
+            .join('<code id="bootcmd">' + escHtml + '</code>');
+          res.setHeader('Content-Length', Buffer.byteLength(html));
+          res.end(html);
+          return;
+        } catch (e) {
+          // 读失败就走下面的流式兜底
+        }
+      }
+
       const stream = createReadStream(file);
       stream.on('error', () => {
         try { res.destroy(); } catch {}
