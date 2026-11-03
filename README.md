@@ -45,7 +45,9 @@
 
 前置：Node.js ≥ 20、装了 DSH、本机有 Chrome（只影响截图工具，不影响主功能）。
 
-### 1. 生成数据
+### 1. 生成数据（只有方式 B「clone 到本地」需要）
+
+如果你打算用下面的**方式 A**（插件管理器里装），这一步先跳过 —— 装完再跑，命令里的目录会不一样。
 
 ```bash
 node sea-build/doctor.mjs    # 先自检：找到几个数据源、缺什么（可选）
@@ -236,6 +238,48 @@ dsh-sea-v1.0.0/
 | 数据目录 | `dsh-plugin-sea/cordis.patch.yml` 的 `root` |
 
 ---
+
+## 装不上 / 装上了是空的
+
+按你看到的症状对号入座。
+
+### 打开是一片空白，写着「还没有记忆数据」
+
+正常 —— 插件不会自己去读你的会话，得手动跑一次生成。页面会把**完整命令**给你（含插件目录），点「复制」粘到终端里跑就行。
+跑完刷新（浮层里点 ↻）。
+
+### 左下角没有 ✦
+
+- 装完必须**重启 DSH**，插件才会被加载
+- 重启还没有：看 DSH 的插件页，这个包是不是被标成「未启用」
+- 还是不行，看崩溃日志 `%APPDATA%\@deepseek-ai\dsh-desktop\logs\crash-*-web-boot.log`，`--- renderer console ---` 那段才有真话
+
+### DSH 起不来了，提示 `web boot: ... did not activate`
+
+这是插件加载失败，不影响你的数据（数据都在 `~/.dsh` 里）。启动失败对话框里有一个「**禁用第三方插件、备份 profile patch 并重启**」的按钮，先点它把 DSH 救回来，再把上面那个 crash 日志发出来。
+
+### 装的时候 pnpm 报一堆 `ERR_PNPM_` 
+
+大概率不是这个插件的问题，是 profile 的依赖锁坏了。典型长这样：
+
+```
+ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY
+ERR_PNPM_RESOLUTION_POLICY_VIOLATIONS_UNHANDLED
+```
+
+说明 `package.json` 里某个依赖的版本和 `pnpm-lock.yaml` 对不上，而 `pnpm-workspace.yaml` 的供应链白名单（`minimumReleaseAgeExclude`）又没放行那个版本。
+在 `~/.dsh/profiles/<profile>/` 下把那个版本加进白名单，然后重建锁：
+
+```bash
+# 例：报的是 billion-context@0.1.212
+# 编辑 pnpm-workspace.yaml，在 minimumReleaseAgeExclude 里加 "billion-context@0.1.212"
+pnpm install --force --lockfile-only
+```
+
+### 装完之后 AI 那边的工具不见了
+
+五个工具（`sea_recall` / `sea_day` / `sea_sessions` / `sea_mark` / `sea_surf`）是插件注册的，插件没启用就没有。
+其中 `sea_surf` 只有装了 SurfCore 才会出现 —— 没有它不影响其它四个。
 
 ## 已知边界（第一版）
 
