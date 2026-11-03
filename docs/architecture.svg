@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 700" width="1120" height="700" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#070b12"/><stop offset="1" stop-color="#04070d"/>
+    </linearGradient>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a7fa8"/>
+    </marker>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7a5f88"/>
+    </marker>
+  </defs>
+
+  <rect width="1120" height="700" fill="url(#bg)"/>
+
+  <!-- 标题 -->
+  <text x="40" y="46" fill="#cfe6f8" font-size="21" font-weight="600">记忆意识海 · 数据怎么流</text>
+  <text x="40" y="70" fill="#5c8098" font-size="12.5">左边是只读的来源，中间一条命令跑完管线，右边两种读法共用同一份产物</text>
+
+  <!-- 第 1 层：数据源 -->
+  <rect x="40" y="96" width="1040" height="132" rx="12" fill="#0a1420" stroke="#1d3b52"/>
+  <text x="62" y="124" fill="#7fdcff" font-size="13" font-weight="600">① 数据源</text>
+  <text x="140" y="124" fill="#4f7488" font-size="11.5">全部在 ~/.dsh 里，只读，不修改任何原始文件</text>
+
+  <g font-size="11.5" fill="#9db9cd">
+    <rect x="62" y="140" width="188" height="32" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="74" y="161" fill="#b6d8f5">sessions/*.jsonl.zstd</text>
+    <text x="204" y="161" fill="#4f7488" font-size="10.5">会话</text>
+
+    <rect x="264" y="140" width="150" height="32" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="276" y="161" fill="#b6d8f5">fish-memory</text>
+    <text x="360" y="161" fill="#4f7488" font-size="10.5">记忆卡</text>
+
+    <rect x="428" y="140" width="150" height="32" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="440" y="161" fill="#b6d8f5">worlds/diary</text>
+    <text x="522" y="161" fill="#4f7488" font-size="10.5">日记</text>
+
+    <rect x="592" y="140" width="176" height="32" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="604" y="161" fill="#b6d8f5">worlds/conversations</text>
+
+    <rect x="782" y="140" width="140" height="32" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="794" y="161" fill="#b6d8f5">attachments</text>
+    <text x="878" y="161" fill="#4f7488" font-size="10.5">缩略图</text>
+
+    <rect x="782" y="182" width="140" height="32" rx="7" fill="#0d1c2a" stroke="#3d2f52" stroke-dasharray="4 3"/>
+    <text x="794" y="203" fill="#c79ad8">surfcore</text>
+    <text x="856" y="203" fill="#6b5578" font-size="10.5">可选</text>
+
+    <rect x="62" y="182" width="596" height="32" rx="7" fill="#0a1622" stroke="#1a3648" stroke-dasharray="4 3"/>
+    <text x="74" y="203" fill="#6f93a8">带图的消息会抓一张缩略图存进 out/thumbs/（原图不动）</text>
+  </g>
+
+  <!-- 箭头 1 -->
+  <line x1="560" y1="228" x2="560" y2="266" stroke="#4a7fa8" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="574" y="252" fill="#6f9ab8" font-size="12">node sea-build/setup.mjs</text>
+  <text x="574" y="268" fill="#4f7488" font-size="10.5">一条命令；只重跑变了的部分（首次约 3 秒，之后约 2 秒）</text>
+
+  <!-- 第 2 层：管线 -->
+  <rect x="40" y="274" width="1040" height="128" rx="12" fill="#0a1420" stroke="#1d3b52"/>
+  <text x="62" y="302" fill="#7fdcff" font-size="13" font-weight="600">② 管线</text>
+  <text x="140" y="302" fill="#4f7488" font-size="11.5">四个脚本，各自能单独跑；中间产物都是 JSON，坏了只要重跑</text>
+
+  <g font-size="11.5">
+    <rect x="62" y="318" width="150" height="30" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="76" y="338" fill="#b6d8f5">collect</text><text x="132" y="338" fill="#4f7488" font-size="10.5">解码+分来源</text>
+
+    <text x="224" y="338" fill="#3d6480" font-size="14">→</text>
+
+    <rect x="248" y="318" width="150" height="30" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="262" y="338" fill="#b6d8f5">layout</text><text x="312" y="338" fill="#4f7488" font-size="10.5">定位+分岛</text>
+
+    <text x="410" y="338" fill="#3d6480" font-size="14">→</text>
+
+    <rect x="434" y="318" width="150" height="30" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="448" y="338" fill="#b6d8f5">build_sc</text><text x="512" y="338" fill="#4f7488" font-size="10.5">记忆卡</text>
+
+    <text x="596" y="338" fill="#3d6480" font-size="14">→</text>
+
+    <rect x="620" y="318" width="170" height="30" rx="7" fill="#0d1c2a" stroke="#20455f"/>
+    <text x="634" y="338" fill="#b6d8f5">match_bridge</text><text x="724" y="338" fill="#4f7488" font-size="10.5">跨源对照</text>
+
+    <rect x="804" y="318" width="256" height="30" rx="7" fill="#0a1622" stroke="#1a3648"/>
+    <text x="818" y="338" fill="#6f93a8">out/ ← 产物，全部是普通文件</text>
+  </g>
+
+  <g font-size="10.5" fill="#5c8098">
+    <text x="62" y="376">产物：</text>
+    <text x="104" y="376" fill="#8fb8d0">data.js</text><text x="160" y="376">星图数据 · </text>
+    <text x="222" y="376" fill="#8fb8d0">texts.js</text><text x="278" y="376">长消息后半截 · </text>
+    <text x="368" y="376" fill="#8fb8d0">hidden.js</text><text x="430" y="376">系统消息全文 · </text>
+    <text x="516" y="376" fill="#8fb8d0">zones.json</text><text x="584" y="376">分域 · </text>
+    <text x="626" y="376" fill="#8fb8d0">sc-data.js</text><text x="692" y="376">记忆卡（可选）</text>
+  </g>
+
+  <!-- 箭头 2：分叉 -->
+  <path d="M560,404 L560,428 L300,428 L300,470" fill="none" stroke="#4a7fa8" stroke-width="1.6" marker-end="url(#arr)"/>
+  <path d="M560,404 L560,428 L830,428 L830,470" fill="none" stroke="#7a5f88" stroke-width="1.6" marker-end="url(#arr2)"/>
+
+  <!-- 第 3 层左：星图 -->
+  <rect x="60" y="478" width="480" height="150" rx="12" fill="#0a1420" stroke="#1d3b52"/>
+  <text x="82" y="506" fill="#7fdcff" font-size="13" font-weight="600">③ 人看：星图</text>
+  <text x="212" y="506" fill="#4f7488" font-size="11.5">双击 out/index.html 就能开，不用装插件</text>
+  <g font-size="11.5" fill="#9db9cd">
+    <text x="82" y="532">漫游 · 搜索 · 点开一颗星看原话</text>
+    <text x="82" y="556">整理：清单 / 体检 / 回顾</text>
+    <text x="82" y="580">往后看 · 重叠 · 年轮 · 情绪四种看法</text>
+    <text x="82" y="604" fill="#6f93a8" font-size="10.5">纯 canvas + 原生 JS，没有构建步骤，离线可用</text>
+  </g>
+
+  <!-- 第 3 层右：工具 -->
+  <rect x="600" y="478" width="480" height="150" rx="12" fill="#0a1420" stroke="#33263f"/>
+  <text x="622" y="506" fill="#c79ad8" font-size="13" font-weight="600">④ AI 用：五个工具</text>
+  <text x="790" y="506" fill="#6b5578" font-size="11.5">DSH 进程里的插件注册，读同一份 out/</text>
+  <g font-size="11.5">
+    <text x="622" y="532" fill="#b6d8f5">sea_recall</text><text x="704" y="532" fill="#9db9cd">翻原话（BM25 + 同义词）</text>
+    <text x="622" y="554" fill="#b6d8f5">sea_day</text><text x="704" y="554" fill="#9db9cd">回顾某天</text>
+    <text x="622" y="576" fill="#b6d8f5">sea_sessions</text><text x="704" y="576" fill="#9db9cd">找会话</text>
+    <text x="622" y="598" fill="#b6d8f5">sea_mark</text><text x="704" y="598" fill="#9db9cd">标星 / 打标签 / 写备注</text>
+    <text x="622" y="620" fill="#c79ad8">sea_surf</text><text x="704" y="620" fill="#6b5578">记忆卡（装了 surfcore 才有）</text>
+  </g>
+
+  <!-- 底部：共用的 marks -->
+  <path d="M300,628 L300,654 L560,654 L560,672" fill="none" stroke="#3a5a72" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <path d="M840,628 L840,654 L560,654 L560,672" fill="none" stroke="#3a5a72" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <rect x="452" y="660" width="216" height="30" rx="8" fill="#0d1c2a" stroke="#2a5570"/>
+  <text x="470" y="680" fill="#8fb8d0" font-size="11.5">marks.json · 人和 AI 共用一份</text>
+</svg>

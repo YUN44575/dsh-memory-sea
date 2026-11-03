@@ -9,7 +9,18 @@
 
 ![漫游记忆星海](docs/screenshots/demo.gif)
 
-*拖动漫游 · 滚轮缩放 · 点一颗星看它当时说了什么*
+*拖动漫游 · 滚轮缩放 · 点一颗星看它当时说了什么*（画面里是演示数据，不是任何人的真实对话）
+
+## 30 秒先看看（不用装插件）
+
+1. 下载这个仓库（或 `git clone`）
+2. 跑一条命令生成数据 —— `node sea-build/setup.mjs`（约 3 秒）
+3. **双击 `sea-build/out/index.html`**
+
+就这样。它是一个纯静态页面：不连网、不起服务、也不读浏览器之外的东西。
+左上角切数据源，左栏点会话，顶上搜，右上「整理」是另一套看法。
+
+装插件是为了**在 DSH 里随时打开它**（左下角一个 ✦ 悬浮球），以及**让 AI 用上这些记忆**。
 
 | 星图：一屏全貌 | 整理：按清单翻、批量标 |
 |---|---|
@@ -18,6 +29,15 @@
 | ![回顾](docs/screenshots/review.jpg) | ![体检](docs/screenshots/health.jpg) |
 | **来源：七类来源独立开关** | |
 | ![来源](docs/screenshots/sources.jpg) | |
+
+---
+
+## 它是怎么运转的
+
+![架构](docs/architecture.svg)
+
+四个数据源只读，一条命令跑完管线，产物就是几个普通 JSON/JS 文件；
+**人**在星图里看它，**AI** 通过五个工具读它，两边共用同一份 `marks.json`。
 
 ---
 
@@ -43,7 +63,7 @@ node sea-build/setup.mjs     # 一条命令跑完整条管线（首次约 3 秒�
 ```
 
 跑完 `sea-build/out/` 里会有 `index.html`、`data.js`、`texts.js`、`zones.json` 等。
-**先双击 `sea-build/out/index.html` 看看**——这一步不需要装插件，是纯静态页面。
+到这里其实就已经能用了（双击 `index.html`）；下面两步是为了**在 DSH 里打开**和**让 AI 能用**。
 
 ### 3. 装插件（一条命令）
 
