@@ -198,7 +198,9 @@
   #search input::placeholder { color: var(--dim); letter-spacing: .1em; }
   #search .cnt { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 0; }
 
-  #tools { display: flex; gap: 8px; pointer-events: auto; flex: none;
+  /* 窗口窄的时候 topbar 会折行：工具栏原来落在第二行最左边，正好压在左栏「意识流 …」上。
+     让它换行后也贴右边，两边各占一块。 */
+  #tools { display: flex; gap: 8px; pointer-events: auto; flex: none; margin-left: auto;
     transition: transform .32s cubic-bezier(.22,.8,.28,1), opacity .22s; }
   /* 右侧面板打开时，右上工具栏让位——但不能整条藏起来（用户会找不到「更多」），
      改成往左让开面板的宽度，仍然能点。 */
@@ -254,7 +256,7 @@
 
   /* ---------- 左栏会话 ---------- */
   #sessions {
-    left: 0; top: 150px; bottom: 96px; width: 210px; padding: 0 0 0 26px;
+    left: 0; top: var(--tb-h, 150px); bottom: 96px; width: 210px; padding: 0 0 0 26px;
     display: flex; flex-direction: column; pointer-events: auto;
     mask-image: linear-gradient(to bottom, transparent, #000 14px, #000 calc(100% - 14px), transparent);
   }
@@ -642,6 +644,9 @@
     font-size: 10.5px; color: #8fb0cc; backdrop-filter: blur(6px); pointer-events: none;
     transition: opacity .25s, transform .25s;
   }
+  /* 在插件浮层里（?embed=1）右下角是外层的控制条「↻ / ← 回到 DSH」，
+     图例原来 bottom:88px 正好压在它上面 —— 往上让一格 */
+  body.embed #legend { bottom: 152px; }
   body[data-theme="shallow"] #legend {
     background: rgba(252, 248, 242, .7); border-color: rgba(160, 120, 80, .3); color: #7a6350;
   }
@@ -7499,10 +7504,22 @@
     get proc() { return PROC; }
   };
 
+  // 顶栏高度不是常数（窗口窄了会折行、引导/时间入口那行也在变），
+  // 左栏得跟着它走，否则一折行就被压住。
+  function measureTopbar() {
+    var tb = document.getElementById('topbar');
+    if (!tb) return;
+    var h = Math.round(tb.getBoundingClientRect().height);
+    if (h > 20) document.documentElement.style.setProperty('--tb-h', (h + 18) + 'px');
+  }
+  measureTopbar();
+  setTimeout(measureTopbar, 300);
+  setTimeout(measureTopbar, 1400);
+
   var rt = null;
   window.addEventListener('resize', function () {
     clearTimeout(rt);
-    rt = setTimeout(function () { resize(); drawTimeline(); }, 120);
+    rt = setTimeout(function () { resize(); drawTimeline(); measureTopbar(); }, 120);
   });
 
   bindShelfTools();
