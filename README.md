@@ -36,7 +36,7 @@ node sea-build/doctor.mjs    # 先自检：找到几个数据源、缺什么
 node sea-build/setup.mjs     # 一条命令跑完整条管线（首次约 3 秒，之后约 2 秒）
 ```
 
-跑完 `sea-build/out/` 里会有 `index.html`、`data.js`、`zones.json` 等。
+跑完 `sea-build/out/` 里会有 `index.html`、`data.js`、`texts.js`、`zones.json` 等。
 **先双击 `sea-build/out/index.html` 看看**——这一步不需要装插件，是纯静态页面。
 
 ### 3. 装插件（一条命令）
@@ -127,7 +127,7 @@ node sea-build/install.mjs --force          # 目录搬过家，覆盖旧的 lin
 | 世界日记 | `<DSH>/.dsh/worlds/default/diary/*.md` + `conversations/*.jsonl` |
 | SurfCore 记忆卡 | `<DSH>/.dsh/surfcore/characters` |
 
-产物都在 `sea-build/`：`nodes.json`（采集）、`out/data.js`（星图）、`out/hidden.js`（系统消息全文）、`out/zones.json`（分域表）、`marks.json`（管理态）。
+产物都在 `sea-build/`：`nodes.json`（采集）、`out/data.js`（星图，长消息只带前 200 字）、`out/texts.js`（长消息的后半截，页面打开 0.8 秒后自动补上）、`out/hidden.js`（系统消息全文）、`out/zones.json`（分域表）、`marks.json`（管理态）。
 
 **没有这些东西也能跑**：缺哪个就少哪一块（`doctor.mjs` 会告诉你怎么回事），不会崩。
 
@@ -161,7 +161,7 @@ dsh-sea-v1.0.0/
 └── sea-build/             ← 数据管线 + 界面
     ├── out/index.html     界面本体（星图 / 整理 / 详情，纯前端无依赖）
     ├── collect.mjs        采集会话 + 记忆卡 + 日记 → nodes.json
-    ├── layout.mjs         语义分岛布局 → out/data.js + out/zones.json（增量：旧星不复位）
+    ├── layout.mjs         语义分岛布局 → out/data.js + out/texts.js + out/zones.json（增量：旧星不复位）
     ├── build_sc.mjs       SurfCore 记忆卡 → out/sc-data.js
     ├── match_bridge.mjs   两片海的重叠桥
     ├── setup.mjs          一条命令跑完上面四步
@@ -192,7 +192,7 @@ dsh-sea-v1.0.0/
 - **分域**粒度是「会话」不是「话题」：工作会话里聊到陪聊对象的事，仍算工作海。
 - **AI 标星**页面最多 8 秒后出现（轮询版本号），不是即时的。
 - **数据量**：现在约 1600 节点 / 1 MB。采集和布局都已是增量（只处理变过的会话、旧星坐标不动）；
-  到 5 万条主要瓶颈变成 `data.js` 单文件体积，需要按月分片。
+  到 5 万条主要瓶颈变成 `texts.js` 全量预载，需要按月拆成 `texts-YYYY-MM.js`。
 - 只在 Windows + Chrome 上验证过。
 
 ---
