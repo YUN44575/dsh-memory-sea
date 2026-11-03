@@ -627,6 +627,36 @@
   body[data-theme="shallow"] #guide .ln.lg { background: rgba(180, 210, 255, .55); }
   body[data-theme="shallow"] #guide .ln.lc { background: rgba(186, 214, 255, .8); }
   #guide .gfoot .btn { cursor: pointer; }
+  /* 图例：全览时告诉人星的大小/亮度/颜色各是什么，几秒就能读懂，不用翻帮助 */
+  #legend {
+    position: fixed; right: 20px; bottom: 88px; z-index: 18;
+    background: rgba(6, 14, 24, .62); border: 1px solid rgba(60, 100, 140, .28);
+    border-radius: 8px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px;
+    font-size: 10.5px; color: #8fb0cc; backdrop-filter: blur(6px); pointer-events: none;
+    transition: opacity .25s, transform .25s;
+  }
+  body[data-theme="shallow"] #legend {
+    background: rgba(252, 248, 242, .7); border-color: rgba(160, 120, 80, .3); color: #7a6350;
+  }
+  #legend .lgrow { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  #legend .lgs { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-left: 2px; }
+  #legend .lgs.wrk { background: #7fdcff; }
+  #legend .lgs.cmp { background: #ff9ec0; margin-left: 10px; }
+  #legend .lgb {
+    width: 8px; height: 8px; border-radius: 50%; background: #cfe8ff;
+    box-shadow: 0 0 6px 2px rgba(160, 215, 255, .55); margin-right: 2px;
+  }
+  #legend .lgring {
+    width: 8px; height: 8px; border-radius: 50%; border: 1px dashed #9fc6e6;
+    margin-left: 9px; margin-right: 2px;
+  }
+  #legend .lgd {
+    width: 6px; height: 6px; border-radius: 50%; background: #cfe8ff;
+    box-shadow: 0 0 5px 2px rgba(160, 215, 255, .5); margin-right: 2px;
+  }
+  #legend .lgd.dim { background: #6f8aa4; box-shadow: none; margin-left: 9px; }
+  #legend.hide { opacity: 0; transform: translateY(6px); }
+
   /* 时间入口：一进来就能问「看哪一段」 */
   #tchips { display: flex; align-items: center; gap: 4px; margin-top: 9px; font-size: 10.5px; flex-wrap: wrap; }
   #tchips .tc {
@@ -1138,6 +1168,12 @@
       <button class="btn" id="guideOk">知道了，去看看</button>
     </div>
   </div>
+</div>
+
+<div id="legend">
+  <div class="lgrow"><i class="lgs wrk"></i>工作海<i class="lgs cmp"></i>陪伴海</div>
+  <div class="lgrow"><i class="lgb"></i>越大＝提得越多 <i class="lgring"></i>虚圈＝长期记忆</div>
+  <div class="lgrow"><i class="lgd"></i>亮＝近 <i class="lgd dim"></i>暗＝远</div>
 </div>
 
 <aside id="results">
@@ -4111,6 +4147,70 @@
       ctx.drawImage(bgc, 0, 0, W, H);
       ctx.globalAlpha = 1;
     }
+
+    // --- 会话名标注：全览时告诉人「这团星是哪几段对话」 ---
+    // 星图最大的门槛是「看得到形状，不知道形状是谁」。这里只标节点最多的前 8 段，
+    // 彼此离得近的让位，避免一屏散着十几个标签谁也看不清。
+    if (layerFade >= 1) drawSessLabels();
+  }
+
+  var _lblKey = '', _lblList = null;
+  function drawSessLabels() {
+    if (cam.s >= 2.0 || matchScores || ringMode || overlapOn || selIdx >= 0) return;
+    if (!SESS) return;
+    var key = Math.round(cam.s * 24) + '|' + Math.round(cam.x * 24) + '|' + Math.round(cam.y * 24)
+      + '|' + visN + '|' + activeSid + '|' + cam.s.toFixed(2);
+    if (key !== _lblKey) {
+      _lblKey = key;
+      var by = {}, sid;
+      for (var i = 0; i < visList.length; i++) {
+        var n = NODES[visList[i]];
+        if (!n.bright) continue;
+        if (activeSid >= 0 && n.sid !== activeSid) continue;
+        if (n.sx < 50 || n.sx > W - 50 || n.sy < 76 || n.sy > H - 70) continue;
+        var cur = by[n.sid];
+        if (!cur || (n.R || 0) > (cur.R || 0)) by[n.sid] = n;
+      }
+      var arr = [];
+      for (sid in by) arr.push(by[sid]);
+      arr.sort(function (a, b) {
+        return ((SESS[b.sid] && SESS[b.sid].count) || 0) - ((SESS[a.sid] && SESS[a.sid].count) || 0);
+      });
+      var picked = [];
+      for (var k = 0; k < arr.length && picked.length < 8; k++) {
+        var n2 = arr[k], ok = true;
+        for (var p = 0; p < picked.length; p++) {
+          var dx = n2.sx - picked[p].sx, dy = n2.sy - picked[p].sy;
+          if (dx * dx + dy * dy < 132 * 132) { ok = false; break; }
+        }
+        if (ok) picked.push(n2);
+      }
+      _lblList = picked;
+    }
+    if (!_lblList || !_lblList.length) return;
+    var lk = Math.min(1, Math.max(0, (1.95 - cam.s) / 0.5));   // 越放大越淡，放大后就靠详情认了
+    if (lk <= 0.02) return;
+    ctx.save();
+    ctx.font = '500 11px "PingFang SC","Microsoft YaHei",system-ui,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    for (var j = 0; j < _lblList.length; j++) {
+      var n3 = _lblList[j];
+      var sv = SESS[n3.sid];
+      var t = (sv && sv.title) ? sv.title : '';
+      if (!t) continue;
+      if (t.length > 13) t = t.slice(0, 12) + '…';
+      if (n3.sx < -20 || n3.sx > W + 20 || n3.sy < -20 || n3.sy > H + 20) continue;
+      var lx = n3.sx + 9, ly = n3.sy - 9;
+      ctx.globalAlpha = 0.55 * lk;
+      ctx.fillStyle = theme === 'deep' ? 'rgba(4,10,18,.9)' : 'rgba(252,248,242,.9)';
+      ctx.fillText(t, lx + 1, ly + 1);
+      ctx.globalAlpha = 0.88 * lk;
+      ctx.fillStyle = theme === 'deep' ? '#b6d8f5' : '#4a3a2e';
+      ctx.fillText(t, lx, ly);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   // 选中的那颗星单独画在最上层：大图 + 光晕 + 取景框
@@ -4739,6 +4839,8 @@
     renderTagArea(idx);
     detail.classList.add('open');
     document.body.classList.add('panel-open');
+    var lg0 = document.getElementById('legend');
+    if (lg0) lg0.classList.add('hide');
     document.getElementById('hint').classList.add('out');
     // 只留相关的记忆（同会话 + 语义相近），其余隐去
     relatedSet = computeRelated(idx);
@@ -4926,6 +5028,8 @@
   }
 
   function closeDetail() {
+    var lg1 = document.getElementById('legend');
+    if (lg1) lg1.classList.remove('hide');
     detail.classList.remove('open');
     if (!document.getElementById('results').classList.contains('open')
         && !document.getElementById('shelf').classList.contains('open')) {
