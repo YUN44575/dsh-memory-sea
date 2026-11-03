@@ -5,13 +5,17 @@
 
 人看的是星图，AI 用的是工具，**两边共用同一份数据**。
 
-![星图](docs/screenshots/star-map.jpg)
+![漫游记忆星海](docs/screenshots/demo.gif)
 
-| 整理：按清单翻、批量标 | 回顾：选一段时间生成一张卡 |
+*拖动漫游 · 滚轮缩放 · 点一颗星看它当时说了什么*
+
+| 星图：一屏全貌 | 整理：按清单翻、批量标 |
 |---|---|
-| ![整理](docs/screenshots/manage-list.jpg) | ![回顾](docs/screenshots/review.jpg) |
-| **体检：每张卡都能点开看它包含什么** | **来源：七类来源独立开关** |
-| ![体检](docs/screenshots/health.jpg) | ![来源](docs/screenshots/sources.jpg) |
+| ![星图](docs/screenshots/star-map.jpg) | ![整理](docs/screenshots/manage-list.jpg) |
+| **回顾：选一段时间生成一张卡** | **体检：每张卡都能点开看它包含什么** |
+| ![回顾](docs/screenshots/review.jpg) | ![体检](docs/screenshots/health.jpg) |
+| **来源：七类来源独立开关** | |
+| ![来源](docs/screenshots/sources.jpg) | |
 
 ---
 
