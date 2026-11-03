@@ -1,5 +1,7 @@
 # 记忆意识海 v1.0.0
 
+> **English** — Memory Sea turns every DSH session into a navigable star map: one star per exchange, coloured by source, browsable by time; click a star to read the original words. It also gives the AI a set of tools to recall its own history (`sea_recall` / `sea_day` / `sea_sessions` / `sea_mark`). Zero dependencies, no API keys, everything stays on your machine.
+
 把 DSH 里的**全部会话**变成一片可以看、可以搜、可以整理的星图；
 同时给会话里的 AI 一套**查自己记忆**的工具（翻原话、回顾某天、标星）。
 
