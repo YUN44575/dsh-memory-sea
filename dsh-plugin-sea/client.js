@@ -16,7 +16,9 @@
  * 以后要改界面，改的还是 sea-build/out/index.html；这份客户端代码几乎不用动。
  */
 window.__ModuleLoader__.load({
-  id: '@local/dsh-plugin-sea',
+  // 这个 id 必须和「装进 DSH 的那个包名」一致：模板里就是包名。
+  // 原来写死 @local/dsh-plugin-sea，从 Git 装（包名 dsh-memory-sea）时会注册成两个不同 factory。
+  id: 'dsh-memory-sea',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
