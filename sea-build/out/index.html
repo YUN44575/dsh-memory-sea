@@ -615,6 +615,56 @@
   body[data-theme="shallow"] #guide .ln.lg { background: rgba(180, 210, 255, .55); }
   body[data-theme="shallow"] #guide .ln.lc { background: rgba(186, 214, 255, .8); }
   #guide .gfoot .btn { cursor: pointer; }
+  /* 开机遮罩：data.js 加载与首帧铺开之前的过渡；也兼作「还没有数据」的提示 */
+  #boot {
+    position: fixed; inset: 0; z-index: 9995; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(60% 60% at 50% 45%, #0a1420 0%, #04070d 100%);
+    transition: opacity .45s ease;
+  }
+  body[data-theme="shallow"] #boot { background: radial-gradient(60% 60% at 50% 45%, #14100c 0%, #0b0705 100%); }
+  #boot.gone { opacity: 0; pointer-events: none; }
+  #boot .bc { text-align: center; max-width: 460px; padding: 0 24px; }
+  #boot .bs { font-size: 14px; letter-spacing: .06em; opacity: .82; }
+  #boot .bt { margin-top: 12px; font-size: 12.5px; line-height: 2; opacity: .52; }
+  #boot .bt code { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,.07); }
+  #boot .bdots { display: inline-flex; gap: 5px; margin-top: 18px; }
+  #boot .bdots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .25; animation: bdot 1.1s infinite; }
+  #boot .bdots i:nth-child(2) { animation-delay: .16s; }
+  #boot .bdots i:nth-child(3) { animation-delay: .32s; }
+  @keyframes bdot { 0%, 100% { opacity: .2; transform: translateY(0); } 50% { opacity: .85; transform: translateY(-3px); } }
+  /* 新手引导（跟点）：挖空高亮 + 气泡，四步讲完 */
+  #tour { position: fixed; inset: 0; z-index: 9990; display: none; pointer-events: none; }
+  #tour.on { display: block; }
+  #tspot {
+    position: absolute; border-radius: 10px; pointer-events: none;
+    box-shadow: 0 0 0 9999px rgba(4, 7, 13, .80), 0 0 0 1px rgba(140, 200, 245, .55),
+                0 0 26px 8px rgba(100, 170, 230, .18);
+    transition: all .28s cubic-bezier(.3, .8, .3, 1);
+  }
+  body[data-theme="shallow"] #tspot {
+    box-shadow: 0 0 0 9999px rgba(12, 8, 6, .80), 0 0 0 1px rgba(245, 190, 140, .55),
+                0 0 26px 8px rgba(230, 160, 100, .18);
+  }
+  #tcard {
+    position: absolute; width: 330px; padding: 16px 18px 13px; border-radius: 12px;
+    background: rgba(10, 16, 24, .97); border: 1px solid rgba(120, 180, 225, .34);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, .6); pointer-events: auto;
+    transition: all .28s cubic-bezier(.3, .8, .3, 1);
+  }
+  body[data-theme="shallow"] #tcard { background: rgba(24, 16, 12, .97); border-color: rgba(225, 175, 130, .34); }
+  #tcard .tstep { font-size: 10px; letter-spacing: .18em; opacity: .5; margin-bottom: 7px; }
+  #tcard h4 { margin: 0 0 8px; font-size: 14px; font-weight: 500; letter-spacing: .02em; }
+  #tcard p { margin: 0 0 14px; font-size: 12.5px; line-height: 1.85; opacity: .82; }
+  #tcard .tfoot { display: flex; gap: 8px; align-items: center; }
+  #tcard .tfoot .btn { cursor: pointer; }
+  #tcard .tfoot .tgo {
+    margin-left: auto; background: rgba(120, 190, 240, .16); border-color: rgba(140, 200, 245, .5); color: #cfe8fb;
+  }
+  #tcard .tfoot .tgo:hover { background: rgba(120, 190, 240, .28); }
+  body[data-theme="shallow"] #tcard .tfoot .tgo {
+    background: rgba(240, 170, 110, .16); border-color: rgba(245, 190, 140, .5); color: #fbe3cf;
+  }
+  #tcard .tskip { opacity: .55; }
 
   /* ===== 来源面板（谁说的话上星）===== */
   /* 不常驻一排 chip：工具栏已经满了，而且来源是"偶尔想换个看法"时用的，
@@ -816,6 +866,14 @@
 </style>
 </head>
 <body data-theme="deep">
+<div id="boot">
+  <div class="bc">
+    <div class="bs">正在铺开星图…</div>
+    <div class="bt">第一次打开会慢一点，之后就快了。</div>
+    <div class="bdots"><i></i><i></i><i></i></div>
+  </div>
+</div>
+
 <canvas id="sea"></canvas>
 
 <div class="hud" id="topbar">
@@ -971,6 +1029,20 @@
   <input type="file" id="shfile" accept=".json,application/json" hidden>
 </aside>
 
+<div id="tour">
+  <div id="tspot"></div>
+  <div id="tcard">
+    <div class="tstep" id="tstep">1 / 4</div>
+    <h4 id="ttitle"></h4>
+    <p id="ttext"></p>
+    <div class="tfoot">
+      <button class="btn tskip" id="tskip">跳过</button>
+      <button class="btn" id="tprev">上一步</button>
+      <button class="btn tgo" id="tnext">下一步</button>
+    </div>
+  </div>
+</div>
+
 <div id="guide">
   <div class="gcard">
     <div class="ghead">
@@ -1063,6 +1135,18 @@
   // 两片海可以切：DSH 会话（window.SEA）/ SurfCore 记忆（window.SC）
   // 两套数据各自归一化到单位圆，共用同一套渲染；切换时只换 SEA 引用 + 过滤，
   // 所以它们永远不会在同一个画面里重叠。
+  // 还没跑过 setup（没有 data.js 里的数据）：别白屏，直接说清楚下一步做什么
+  if (!window.SEA || !Array.isArray(window.SEA.nodes) || !window.SEA.nodes.length) {
+    var boot0 = document.getElementById('boot');
+    if (boot0) {
+      boot0.innerHTML = '<div class="bc">'
+        + '<div class="bs">还没有记忆数据</div>'
+        + '<div class="bt">先在项目目录跑一次<br><code>node sea-build/setup.mjs</code><br>'
+        + '它会把你的 DSH 会话采集进来，跑完刷新这一页就能看到星图。</div>'
+        + '</div>';
+    }
+    return;
+  }
   var DSHSEA = window.SEA;
   var SCSEA = window.SC || null;
   var DSHN = DSHSEA.nodes.length;
@@ -1687,6 +1771,12 @@
       document.getElementById('qcnt').textContent = '没有找到';
       hideResults();
       refreshFilter();
+      // 只说「没有找到」等于把人晾在那儿：告诉他下一步能做什么
+      var nfh = [];
+      if (typeof srcFiltering === 'function' && srcFiltering()) nfh.push('点右上「来源」把来源全打开');
+      if (TH && TH.layer !== 'deep') nfh.push('点「' + (TH.layer === 'shallow' ? '远洋' : '近岸') + '」换一层看看');
+      nfh.push('换个更短的词、或者只搜一个关键词');
+      toast('没找到「' + text.trim() + '」· ' + nfh.join('，'));
       return;
     }
     matchTh = th;
@@ -1703,6 +1793,18 @@
   //    旧版（v1）按 i 存的数据在 migrateMarks() 里一次性翻译过来。
   // 📴 存两处：localStorage（离线/双击打开也能用）+ host 的 marks.json（插件里打开时两边共用一份，
   //    以前 file:// 与 http:// 不同源 = 两套管理，就是这个坑）。
+  // 通用轻提示：右下角那个 #newver 条。之前各个功能各自写 toast，
+  // 而 poster 里的 say 是函数内局部变量 —— 别处调用会直接 ReferenceError。
+  var _toastT = null;
+  function toast(msg) {
+    var el = document.getElementById('newver');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('on');
+    clearTimeout(_toastT);
+    _toastT = setTimeout(function () { el.classList.remove('on'); }, 3800);
+  }
+
   var MARKS_KEY = 'sea.marks.v1';
   // 正文分片：data.js 里每条只带前 200 字（星图、列表、tip 都够用），
   // 更长的后半截在 texts.js 里，打开页面后静默补上；补上之前详情会先显示前 200 字。
@@ -3141,7 +3243,17 @@
     gc.globalCompositeOperation = 'source-over';
   }
 
+  var bootDropped = false;
+  function dropBoot() {
+    if (bootDropped) return;
+    bootDropped = true;
+    var b = document.getElementById('boot');
+    if (!b) return;
+    b.classList.add('gone');
+    setTimeout(function () { if (b && b.parentNode) b.parentNode.removeChild(b); }, 520);
+  }
   function draw(now) {
+    if (!bootDropped) { dropBoot(); }
     renderFrame(now - t0);
     requestAnimationFrame(draw);
   }
@@ -4409,11 +4521,11 @@
     var n = NODES[idx];
     if (!n) return false;
     if (marks.hide[nkey(idx)]) {
-      say('这一条你隐去了 · 打开「整理 → 看隐去的」能找回来');
+      toast('这一条你隐去了 · 打开「整理 → 看隐去的」能找回来');
       return false;
     }
     if (marks.arch[skey(n.sid)]) {
-      say('这段对话归档了 · 打开「整理 → 归档会话」能取消');
+      toast('这段对话归档了 · 打开「整理 → 归档会话」能取消');
       return false;
     }
     var dirty = false;
@@ -4888,9 +5000,78 @@
     g.addEventListener('click', function (e) { if (e.target === g) shut(1); });
     var hb = document.getElementById('helpbtn');
     if (hb) hb.onclick = function () { g.classList.add('open'); };
-    var seen = null;
+    // 第一次来不直接甩一整篇说明（读不完也不知道从哪下手），
+    // 改成四步「跟点」：说到哪个元素，就把哪个元素框出来。
+    var TOUR = [
+      { sel: '#topbar', pos: 'bottom', title: '这是一片「记忆星海」',
+        text: '你在 DSH 里说过的每一句话，都在这里变成一颗星。下面四步，一分钟就能上手。' },
+      { sel: '#q', pos: 'bottom', title: '想找什么，直接搜',
+        text: '输入一个词或一句话，海里立刻只留下跟它相关的星。记不清原话也没关系，搜你大概记得的词。' },
+      { sel: '#sesslist', pos: 'right', title: '左边是你的会话清单',
+        text: '按你建的工作区分好组了。点其中一段，属于这段对话的星会亮起来，还能顺着往下读。' },
+      { sel: '#sea', pos: 'center', title: '点一颗星，看它当时说了什么',
+        text: '星越大 = 这条你反复提过；外面有虚线圈 = 被标成了长期记忆。右边随时能翻全文、打标签。' }
+    ];
+    var tourEl = document.getElementById('tour');
+    var spotEl = document.getElementById('tspot');
+    var cardEl = document.getElementById('tcard');
+    var tourK = 0;
+    function saveTour() { try { localStorage.setItem('sea.tour.v1', '1'); } catch (e) {} }
+    function tourEnd(openGuide) {
+      tourEl.classList.remove('on');
+      saveTour();
+      if (openGuide) g.classList.add('open');
+    }
+    function placeCard(r, pos) {
+      var W = window.innerWidth, H = window.innerHeight;
+      var cw = 330, ch = cardEl.offsetHeight || 190, GAP = 14;
+      var x, y;
+      if (pos === 'center' || !r) { x = (W - cw) / 2; y = H - ch - 70; }
+      else if (pos === 'right') { x = Math.min(r.right + GAP, W - cw - 16); y = Math.max(16, Math.min(r.top + 30, H - ch - 16)); }
+      else { x = Math.max(16, Math.min(r.left + r.width / 2 - cw / 2, W - cw - 16)); y = r.bottom + GAP; if (y + ch > H - 16) y = Math.max(16, r.top - ch - GAP); }
+      cardEl.style.left = x + 'px';
+      cardEl.style.top = y + 'px';
+    }
+    function tourStep(k) {
+      if (k >= TOUR.length) { tourEnd(false); return; }
+      if (k < 0) k = 0;
+      tourK = k;
+      var st = TOUR[k];
+      document.getElementById('tstep').textContent = (k + 1) + ' / ' + TOUR.length;
+      document.getElementById('ttitle').textContent = st.title;
+      document.getElementById('ttext').textContent = st.text;
+      document.getElementById('tprev').style.visibility = k === 0 ? 'hidden' : 'visible';
+      document.getElementById('tnext').textContent = k === TOUR.length - 1 ? '开始用' : '下一步';
+      var el = document.querySelector(st.sel);
+      var r = el ? el.getBoundingClientRect() : null;
+      if (r && st.pos !== 'center') {
+        var pad = 6;
+        spotEl.style.display = 'block';
+        spotEl.style.left = (r.left - pad) + 'px';
+        spotEl.style.top = (r.top - pad) + 'px';
+        spotEl.style.width = (r.width + pad * 2) + 'px';
+        spotEl.style.height = (r.height + pad * 2) + 'px';
+      } else {
+        // 全屏的星图：不挖洞（挖了整块都被框住），只留气泡
+        spotEl.style.display = 'none';
+        spotEl.style.boxShadow = '0 0 0 9999px rgba(4,7,13,.62)';
+      }
+      placeCard(r, st.pos);
+    }
+    function startTour() {
+      tourEl.classList.add('on');
+      tourStep(0);
+    }
+    document.getElementById('tnext').onclick = function () { tourStep(tourK + 1); };
+    document.getElementById('tprev').onclick = function () { tourStep(tourK - 1); };
+    document.getElementById('tskip').onclick = function () { tourEnd(false); };
+    window.addEventListener('resize', function () { if (tourEl.classList.contains('on')) tourStep(tourK); });
+    var tSeen = null, seen = null;
+    try { tSeen = localStorage.getItem('sea.tour.v1'); } catch (e) {}
     try { seen = localStorage.getItem('sea.guide.v1'); } catch (e) {}
-    if (!seen) setTimeout(function () { g.classList.add('open'); }, 900);
+    // 看过老版长说明的人算「已上手」，不再弹四步
+    if (!tSeen && seen) { saveTour(); tSeen = '1'; }
+    if (!tSeen) setTimeout(startTour, 1200);
   })();
 
   // ================= 创意 5：把这片海导出成一张星图 =================
