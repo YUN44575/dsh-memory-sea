@@ -79,6 +79,10 @@ node sea-build/setup.mjs
 
 还没数据时打开星图，画面上会直接告诉你跑这条命令。
 
+> **数据存在哪**：装成插件后，产物会落到 `~/.dsh/sea-out/`（不在 `node_modules` 里）。
+> 这样插件升级、删掉重装，记忆都还在 —— 只有 `marks.json`（收藏/标签/备注）在 `~/.dsh/marks.json`。
+> 如果你是把仓库 clone 下来直接用（方式 B），数据仍然在 `sea-build/out/`，双击 `index.html` 就能看。
+
 > 装之前如果已经装过旧的 `@local/dsh-plugin-sea`，先把它卸掉 —— 两个都装会有两个悬浮球。
 
 **方式 B：命令行（clone 下来装）**

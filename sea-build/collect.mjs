@@ -354,7 +354,9 @@ for (const sy of sysOut) {
   for (const it of (sy.all || [])) sysAll.push({ k: sy.kind, t: it.time, sid: it.sid, d: it.txt });
 }
 sysAll.sort((a, b) => b.t - a.t);
-const HIDDEN = OUT.replace(/nodes\.json$/, 'out' + String.fromCharCode(92) + 'hidden.js');
+// 注意：nodes.json 现在跟着数据目录走（可能在 ~/.dsh/ 下），所以 hidden.js 必须直接指向 P.out，
+// 不能从 nodes.json 的路径去推（以前是 sea-build/nodes.json → sea-build/out/hidden.js，那个假设已经不成立）
+const HIDDEN = join(P.out, 'hidden.js');
 writeFileSync(HIDDEN, 'window.SEA_SYS=' + JSON.stringify(sysAll) + ';\n', 'utf8');
 stat.sysFull = sysAll.length;
 const tMin = nodes[0]?.time || 0, tMax = nodes[nodes.length - 1]?.time || 0;

@@ -25,6 +25,20 @@ function readConfig() {
   }
 }
 
+/**
+ * 数据目录放哪。
+ *  - 本地开发（仓库里的 sea-build/out 已经有 data.js）：继续用本地的，双击 index.html 就能看
+ *  - 装成插件后：sea-build/out 只是壳子（没有 data.js），数据写到 ~/.dsh/sea-out
+ *    这一条很重要 —— 插件更新/重装会把 node_modules/dsh-memory-sea 整个换掉，
+ *    数据如果写在里面，每次升级记忆都会被清空。
+ */
+function pickOut(dsh) {
+  const env = String(process.env.SEA_DATA_DIR || '').trim();
+  if (env) return resolve(env);
+  if (existsSync(join(OUT_DIR, 'data.js'))) return OUT_DIR;
+  return join(dsh, 'sea-out');
+}
+
 /** 候选：配置里写的 > DSH_HOME > <用户目录>/.dsh */
 function pickDsh(cfg) {
   const cands = [];
@@ -40,6 +54,7 @@ export function loadPaths() {
   const p = cfg.paths || {};
   const dsh = pickDsh(p);
   const j = (...a) => join(dsh, ...a);
+  const out = p.out || pickOut(dsh);
   return {
     dsh,
     sessions: p.sessions || j('sessions'),
@@ -48,8 +63,9 @@ export function loadPaths() {
     fishMemory: p.fishMemory || j('fish-memory'),
     worlds: p.worlds || j('worlds', 'default'),
     surfcore: p.surfcore || j('surfcore'),
-    nodes: p.nodes || join(HERE, 'nodes.json'),
-    out: p.out || OUT_DIR,
+    // 中间产物 nodes.json 跟着数据目录走（本地是 sea-build/nodes.json，插件是 ~/.dsh/nodes.json）
+    nodes: p.nodes || join(dirname(out), 'nodes.json'),
+    out,
     config: CONFIG_FILE,
   };
 }

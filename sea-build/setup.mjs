@@ -44,6 +44,8 @@ if (!existsSync(P.sessions)) {
 }
 
 step('采集会话 → nodes.json', [join(HERE, 'collect.mjs')]);
+// 缩略图必须在 layout 之前：layout 要读 out/thumbs/ 才知道哪些节点有图（填 th 字段）
+step('图片缩略图', [join(HERE, 'thumbs.mjs')], false);
 step('算布局 → data.js + zones.json', [join(HERE, 'layout.mjs')]);
 
 if (existsSync(P.surfcore)) {

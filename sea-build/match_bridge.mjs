@@ -3,9 +3,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadPaths } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(HERE, 'out');
+// 产物不一定在 sea-build/out：装成插件后数据在 ~/.dsh/sea-out，统一从 paths 拿
+const ROOT = loadPaths().out;
 
 function load(file) {
   const src = fs.readFileSync(file, 'utf8');

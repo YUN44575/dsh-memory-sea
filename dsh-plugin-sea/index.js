@@ -205,8 +205,18 @@ function makeDataReader(root) {
     return surf;
   }
 
-  // 别人装完常常是「打开了但一片空」：把要跑的命令算成完整一行，前端/工具直接给用户复制
-  const setupCmd = () => 'cd "' + normalize(join(root, '..', '..')) + '" && node sea-build/setup.mjs';
+  // 别人装完常常是「打开了但一片空」：把要跑的命令算成完整一行，前端/工具直接给用户复制。
+  // 注意要在「包目录」跑（sea-build/ 在那儿），不是数据目录 —— 插件装好后数据在 ~/.dsh/sea-out，
+  // 从数据目录往上两级是用户目录，那里没有 sea-build。
+  const setupCmd = () => {
+    let dir = '';
+    try {
+      dir = normalize(join(fileURLToPath(new URL('.', import.meta.url)), '..')); // dsh-plugin-sea/.. = 包根
+    } catch {
+      dir = normalize(join(root, '..', '..'));
+    }
+    return 'cd "' + dir + '" && node sea-build/setup.mjs';
+  };
   return { load, loadSysAll, loadIndex, loadConfig, loadSurf, setupCmd };
 }
 
@@ -983,28 +993,34 @@ const readBody = (req, max = 8 * 1024 * 1024) =>
 
 // ───────────────────────────────────────────── 主力
 /**
- * 数据目录（也就是 sea-build/out）解析顺序：
+ * 数据目录解析顺序：
  *   1. config.root —— cordis.patch.yml 里写的
  *   2. 环境变量 SEA_DATA_DIR
- *   3. 插件自己旁边：<插件目录>/../sea-build/out（软链安装时这就是仓库里的产物目录）
- *   4. <用户目录>/.dsh/sea-out
- * 第 3 条是关键：`install.mjs` 用软链装时，装完什么都不用配就能找到数据。
+ *   3. <用户目录>/.dsh/sea-out（持久位置：插件更新/重装不会动它）
+ *   4. 插件自己旁边：<插件目录>/../sea-build/out（克隆下来直接用、或 install.mjs 软链装）
+ *   5. 都没有 → 还是 ~/.dsh/sea-out（页面会提示「还没跑 setup」）
+ *
+ * 第 3 条排在第 4 条前面是有原因的：数据写在 node_modules 里，插件一升级就没了。
+ * 只要 ~/.dsh/sea-out 里已经有 data.js，就优先用它；没有才回落到插件旁边（本地开发场景）。
  */
 function resolveRoot(configRoot) {
   const raw = String(configRoot || '').trim();
   if (raw) return normalize(raw);
   const env = String(process.env.SEA_DATA_DIR || '').trim();
   if (env) return normalize(env);
+  const home = process.env.USERPROFILE || process.env.HOME || '.';
+  const persistent = normalize(join(home, '.dsh', 'sea-out'));
+  // 持久位置已经有数据 → 优先
+  try {
+    if (existsSync(join(persistent, 'data.js'))) return persistent;
+  } catch {}
+  // 本地开发 / 克隆安装：插件旁边就有产物
   try {
     const here = fileURLToPath(new URL('.', import.meta.url));
     const guess = normalize(join(here, '..', 'sea-build', 'out'));
-    // 只要这个目录存在就认它：仓库/安装包里本来就带 sea-build/out（至少有个 index.html 壳子）。
-    // 不要用「data.js 在不在」当条件 —— DSH 先启动、数据后生成时，root 会被定到别处，
-    // 结果整个 /sea 都是 404。
     if (existsSync(guess)) return guess;
   } catch {}
-  const home = process.env.USERPROFILE || process.env.HOME || '.';
-  return normalize(join(home, '.dsh', 'sea-out'));
+  return persistent;
 }
 
 export async function apply(ctx, config) {
@@ -1027,26 +1043,47 @@ export async function apply(ctx, config) {
     res.end(JSON.stringify(obj));
   };
 
-  const fileFor = async (rel) => {
-    // 目录穿越防护：解析后必须仍在 root 里
-    let p = normalize(join(root, rel));
-    if (p !== root && !p.startsWith(root + sep)) return null;
-    let st;
-    try {
-      st = await fsp.stat(p);
-    } catch {
-      return null;
-    }
-    if (st.isDirectory()) {
-      p = join(p, 'index.html');
-      try {
-        st = await fsp.stat(p);
-      } catch {
-        return null;
-      }
-    }
-    if (!st.isFile()) return null;
+  // 页面（index.html）和前端代码永远用插件自带的那份：插件升级后页面要跟着变。
+  // 数据（data.js / texts.js / thumbs/ …）在数据目录里：那里插件升级不会动。
+  // 本地开发时两者是同一个目录，下面这段等价于原来的单根查找。
+  let codeRoot = root;
+  try {
+    const here = fileURLToPath(new URL('.', import.meta.url));
+    const beside = normalize(join(here, '..', 'sea-build', 'out'));
+    if (existsSync(join(beside, 'index.html'))) codeRoot = beside;
+  } catch {}
+
+  /** 只允许落在给定根里（目录穿越防护） */
+  const safeJoin = (base, rel) => {
+    const p = normalize(join(base, rel));
+    if (p !== base && !p.startsWith(base + sep)) return null;
     return p;
+  };
+
+  const statFile = async (p) => {
+    if (!p) return null;
+    try {
+      const st = await fsp.stat(p);
+      if (st.isFile()) return p;
+      if (st.isDirectory()) {
+        const idx = join(p, 'index.html');
+        const st2 = await fsp.stat(idx);
+        return st2.isFile() ? idx : null;
+      }
+    } catch {}
+    return null;
+  };
+
+  const fileFor = async (rel) => {
+    // index.html（以及没有扩展名的路径）走代码根；其余先找数据根，找不到再找代码根
+    const isPage = rel === 'index.html' || rel === '' || !extname(rel);
+    if (isPage) {
+      const hit = await statFile(safeJoin(codeRoot, rel || 'index.html'));
+      if (hit) return hit;
+    }
+    const fromData = await statFile(safeJoin(root, rel));
+    if (fromData) return fromData;
+    return statFile(safeJoin(codeRoot, rel));
   };
 
   /** /sea/api/* —— 走在这里，剩下的才当静态文件 */
@@ -1083,6 +1120,11 @@ export async function apply(ctx, config) {
     if (path === '/api/status') {
       try {
         const d = await reader.load();
+        // caps 实时算：apply 时数据可能还没生成（刚装完没跑 setup），
+        // 那种时候算出来的 false 会一直挂在那儿，直到用户重启 DSH 才恢复
+        const capsNow = { surf: caps.surf, zones: false, hidden: false };
+        try { capsNow.zones = !!d.zones && Object.keys(d.zones).length > 0; } catch {}
+        try { const sa = await reader.loadSysAll(); capsNow.hidden = !!(sa && sa.length); } catch {}
         sendJson(res, 200, {
           ok: true,
           builtAt: d.builtAt,
@@ -1091,11 +1133,11 @@ export async function apply(ctx, config) {
           sys: d.sys.length,
           proc: d.proc,
           file: d.file,
-          caps,
+          caps: capsNow,
           setupCmd: reader.setupCmd(),
         });
       } catch (e) {
-        sendJson(res, 503, { ok: false, message: String(e?.message || e), setupCmd: reader.setupCmd() });
+        sendJson(res, 503, { ok: false, message: String(e?.message || e), caps, setupCmd: reader.setupCmd() });
       }
       return;
     }
@@ -1167,21 +1209,18 @@ export async function apply(ctx, config) {
   });
 
   // ── 能力探测：没有的东西不挂工具（免得 AI 看到就用、用完拿到"没有"）
+  // 注意这里看的是「这台机器有没有这个东西」，不是「数据现在生成没有」：
+  // 刚装完还没跑 setup 时数据是空的，但用户跑完 setup 再刷新页面，工具应该已经在了。
   const wantTools = config?.tools !== false;
   if (wantTools) {
     try {
-      const sf = await reader.loadSurf();
-      caps.surf = !!(sf && Array.isArray(sf.nodes) && sf.nodes.length);
+      const home = process.env.USERPROFILE || process.env.HOME || '';
+      // SurfCore 装了（~/.dsh/surfcore 存在）或者数据已经生成过，才挂 sea_surf
+      caps.surf =
+        existsSync(join(home, '.dsh', 'surfcore')) || existsSync(join(root, 'sc-data.js'));
     } catch {}
     if (config?.tools && config.tools.surf === false) caps.surf = false;
-    try {
-      const d = await reader.load();
-      caps.zones = !!d.zones && Object.keys(d.zones).length > 0;
-    } catch {}
-    try {
-      const sa = await reader.loadSysAll();
-      caps.hidden = !!(sa && sa.length);
-    } catch {}
+    // zones / hidden 只影响 /api/status 的展示，那里会实时算，这里不用管
   }
 
   // ── AI 记忆工具：注册失败不能拖垮静态服务（工具只是加分项）
