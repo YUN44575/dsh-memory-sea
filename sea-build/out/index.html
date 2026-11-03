@@ -784,6 +784,23 @@
     padding:7px 12px;color:#dbeaf8;font-size:12px;outline:none;font-family:inherit}
   #mgq:focus{border-color:#2f5c8a}
   .mgc{font-size:11px;color:#6c8aa8;font-variant-numeric:tabular-nums}
+  .mgtrashbar{display:flex;align-items:center;gap:12px;font-size:11px;color:#9db8d0;
+    background:rgba(120,80,40,.12);border:1px solid rgba(180,120,60,.3);border-radius:7px;
+    padding:8px 12px;margin-bottom:10px}
+  .mgtrashbar button{margin-left:auto;background:transparent;border:1px solid #3d5a78;color:#cfe6fa;
+    font-size:10.5px;padding:3px 10px;border-radius:5px;cursor:pointer}
+  .mgtrashbar button:hover{border-color:#5f8cb8;background:rgba(60,110,160,.18)}
+  #mgcleanp{position:absolute;right:26px;top:92px;width:420px;z-index:5;background:#0a1420;
+    border:1px solid #1d3250;border-radius:9px;padding:12px 14px;box-shadow:0 12px 36px rgba(0,0,0,.5)}
+  #mgcleanp .mcp-h{font-size:10.5px;color:#7398bb;letter-spacing:.12em;margin-bottom:9px}
+  #mgcleanp .mcp-f{margin-top:10px;margin-bottom:0;letter-spacing:0;color:#5f7e9c;line-height:1.6}
+  #mgcleanp .mcp-r{padding:9px 0;border-bottom:1px solid #101f2e;cursor:pointer;position:relative}
+  #mgcleanp .mcp-r:last-of-type{border-bottom:none}
+  #mgcleanp .mcp-r:hover b{color:#dff1ff}
+  #mgcleanp .mcp-r b{display:block;font-size:11.5px;color:#b9d3e8;font-weight:normal}
+  #mgcleanp .mcp-r i{position:absolute;right:0;top:9px;font-style:normal;font-size:11px;color:#9fd4ff}
+  #mgcleanp .mcp-r span{display:block;font-size:10px;color:#5f7e9c;margin-top:3px;line-height:1.55}
+  #mgcleanp .mcp-r.off{opacity:.42;cursor:default}
   .mgio{background:transparent;border:1px solid #1d3250;color:#9db8d0;font-size:10.5px;
     padding:3px 9px;border-radius:5px;cursor:pointer;margin-left:auto;letter-spacing:.04em}
   .mgio + .mgio{margin-left:6px}
@@ -983,6 +1000,8 @@
   <div class="mgh">
     <span class="mgt">整理 · 全部记忆</span>
     <input id="mgq" placeholder="搜内容 / 会话 / 标签 / 备注…">
+    <button class="mgio" id="mgtrash" title="隐去 / 归档的都在这里，能收回来">回收站</button>
+    <button class="mgio" id="mgclean" title="几条能一把清掉噪音的规则，先看清影响多少条再决定">清理…</button>
     <button class="mgio" id="mgexp" title="把收藏 / 标签 / 备注 / 隐去 / 归档导出成一个文件，换机器也能带走">导出</button>
     <button class="mgio" id="mgimp" title="从之前导出的文件恢复">导入</button>
     <span class="mgc" id="mgcount"></span>
@@ -6434,6 +6453,10 @@
     var html = '';
     var limit = Math.min(rows.length, mgPage);
     for (var r = 0; r < limit; r++) html += mgRowHtml(rows[r]);
+    if (mgFilter === 'hide' && rows.length) {
+      html = '<div class="mgtrashbar">回收站 · 隐去的都在这里，星图上暂时不显示'
+        + '<button id="mgrestoreall">全部恢复</button></div>' + html;
+    }
     if (!rows.length) html = '<div class="mgo">这里没有符合条件的记忆。</div>';
     else if (rows.length > limit) html += '<div class="mgo" id="mgmore">还有 ' + (rows.length - limit) + ' 条 · 点这里再多看 ' + Math.min(240, rows.length - limit) + ' 条</div>';
     body.innerHTML = html;
@@ -6447,6 +6470,7 @@
           '<button data-mgbulk="star">收藏</button>' +
           '<button data-mgbulk="unstar">取消收藏</button>' +
           '<button data-mgbulk="hide">隐去</button>' +
+          '<button data-mgbulk="unhide">恢复</button>' +
           '<button data-mgbulk="tag">打标签…</button>' +
           '<button data-mgbulk="clear">清空选择</button>';
       } else foot.classList.remove('on');
@@ -6454,6 +6478,8 @@
 
     var more = document.getElementById('mgmore');
     if (more) more.onclick = function () { mgPage += 240; renderMgmt(); };
+    var ra = document.getElementById('mgrestoreall');
+    if (ra) ra.onclick = function (ev) { ev.stopPropagation(); mgRestoreAll(); };
   }
 
   /** 体检：把「这一堆记忆的健康状况」变成几个数字 */
@@ -6614,6 +6640,10 @@
       idxs.forEach(function (i) { marks.hide[nkey(i)] = 1; });
       saveMarks(); refreshFilter(); renderMgmt();
       mgToast('隐去 ' + idxs.length + ' 条');
+    } else if (act === 'unhide') {
+      idxs.forEach(function (i) { delete marks.hide[nkey(i)]; });
+      saveMarks(); refreshFilter(); renderMgmt();
+      mgToast('恢复 ' + idxs.length + ' 条');
     } else if (act === 'tag') {
       var name = prompt('给这 ' + idxs.length + ' 条打一个标签（12 字以内）');
       if (!name) return;
@@ -7019,6 +7049,112 @@
   // 管理态：先把旧版（键=下标）翻译成稳定 id，再跟 host 的 marks.json 对一次
   migrateMarks();
   syncMarksFromHost();
+  /* ---------------- 回收站 / 清理 ----------------
+     隐去是「我不想再看见」，不是「删掉」——所以必须给一条回来的路。
+     清理则是反过来：先算一条规则会影响多少条，看清了再点，别一键把海清空。 */
+
+  function mgTrashOpen() {
+    mgFilter = 'hide';
+    mgTab = 'list';
+    mgPage = 240;
+    var hv = document.getElementById('mghide');
+    if (hv) hv.checked = true;
+    renderMgmt();
+  }
+
+  /** 隐去了多少条 */
+  function hidCount() {
+    var c = 0;
+    for (var i = 0; i < N; i++) if (marks.hide[nkey(i)]) c++;
+    return c;
+  }
+
+  function mgRestoreAll() {
+    var n0 = hidCount();
+    if (!n0) return;
+    if (!confirm('把隐去的 ' + n0 + ' 条全部恢复？')) return;
+    marks.hide = {};
+    saveMarks(); refreshFilter(); renderMgmt();
+    mgToast('已恢复 ' + n0 + ' 条');
+  }
+
+  /** 清理规则：每条都先算出「会影响多少条」，让人自己决定 */
+  function mgCleanRules() {
+    var now = (SEA && SEA.t1) ? SEA.t1 : Date.now();
+    var old = now - 30 * 864e5;
+    var shortN = 0, oldN = 0, sysN = 0;
+    var sysRe = /^(继续|好的|可以|嗯|行|收到|谢谢|11|ok|OK|好|是的|对|明白|知道了|稍等)$/;
+    for (var i = 0; i < N; i++) {
+      var n = NODES[i];
+      if (n.src_ === 'sc') continue;
+      if (marks.hide[nkey(i)]) continue;
+      var t = (n.txt || '').trim();
+      if (t && t.length <= 6 && sysRe.test(t)) shortN++;
+      if ((n.t || 0) < old && !marks.star[nkey(i)] && !marks.note[nkey(i)]
+          && !(marks.tag[nkey(i)] || []).length) oldN++;
+      if (/^(［身份］|［统一人设卡|【当前时间】|【我的时间】)/.test(t)) sysN++;
+    }
+    return [
+      { k: 'short', label: '隐去「继续 / 可以 / 11」这类填空话', n: shortN,
+        hint: '六个字以内、且是纯应答——留着不占信息量，但会占满清单' },
+      { k: 'old', label: '隐去 30 天前从未被标记过的', n: oldN,
+        hint: '没收藏、没标签、没备注的旧记录；星图上仍然留着，从回收站能全部恢复' },
+      { k: 'sys', label: '隐去重复注入的人设卡 / 时间卡', n: sysN,
+        hint: '「［身份］」「【当前时间】」这类每次对话都塞一遍的模板，判重已经并过一部分' }
+    ];
+  }
+
+  function mgCleanApply(k) {
+    var rules = mgCleanRules();
+    var rule = null;
+    for (var i = 0; i < rules.length; i++) if (rules[i].k === k) rule = rules[i];
+    if (!rule || !rule.n) return;
+    if (!confirm('会隐去 ' + rule.n + ' 条。\n隐去不是删除，随时能在「回收站」恢复。继续？')) return;
+    var now = (SEA && SEA.t1) ? SEA.t1 : Date.now();
+    var old = now - 30 * 864e5;
+    var sysRe = /^(继续|好的|可以|嗯|行|收到|谢谢|11|ok|OK|好|是的|对|明白|知道了|稍等)$/;
+    var cnt = 0;
+    for (var j = 0; j < N; j++) {
+      var n = NODES[j];
+      if (n.src_ === 'sc') continue;
+      if (marks.hide[nkey(j)]) continue;
+      var t = (n.txt || '').trim();
+      var hit = false;
+      if (k === 'short') hit = t && t.length <= 6 && sysRe.test(t);
+      else if (k === 'old') hit = (n.t || 0) < old && !marks.star[nkey(j)] && !marks.note[nkey(j)]
+        && !(marks.tag[nkey(j)] || []).length;
+      else if (k === 'sys') hit = /^(［身份］|［统一人设卡|【当前时间】|【我的时间】)/.test(t);
+      if (hit) { marks.hide[nkey(j)] = 1; cnt++; }
+    }
+    saveMarks(); refreshFilter(); renderMgmt();
+    mgToast('隐去 ' + cnt + ' 条 · 在回收站能恢复');
+  }
+
+  function mgCleanPanel() {
+    var old = document.getElementById('mgcleanp');
+    if (old) { old.remove(); return; }
+    var rules = mgCleanRules();
+    var p = document.createElement('div');
+    p.id = 'mgcleanp';
+    var h = '<div class="mcp-h">清理 · 先看清会影响多少条</div>';
+    for (var i = 0; i < rules.length; i++) {
+      var r = rules[i];
+      h += '<div class="mcp-r' + (r.n ? '' : ' off') + '" data-mcclean="' + r.k + '">'
+        + '<b>' + r.label + '</b><i>' + r.n + ' 条</i>'
+        + '<span>' + r.hint + '</span></div>';
+    }
+    h += '<div class="mcp-h mcp-f">隐去不是删除：全部能从「回收站」恢复。</div>';
+    p.innerHTML = h;
+    document.getElementById('mgmt').appendChild(p);
+    p.addEventListener('click', function (ev) {
+      var t = ev.target;
+      while (t && t !== p && !(t.getAttribute && t.getAttribute('data-mcclean'))) t = t.parentNode;
+      if (!t || t === p) return;
+      mgCleanApply(t.getAttribute('data-mcclean'));
+      p.remove();
+    });
+  }
+
   // 整理页顶栏的导出 / 导入：和收藏夹里那两个是同一套动作，只是放在更显眼的地方
   (function () {
     var ex = document.getElementById('mgexp');
@@ -7029,6 +7165,13 @@
       ev.stopPropagation();
       if (fl) fl.click();
     };
+  })();
+
+  (function bindTrashClean() {
+    var tb = document.getElementById('mgtrash');
+    var cb = document.getElementById('mgclean');
+    if (tb) tb.onclick = function (ev) { ev.stopPropagation(); mgTrashOpen(); };
+    if (cb) cb.onclick = function (ev) { ev.stopPropagation(); mgCleanPanel(); };
   })();
 
   // 时间入口：一进来先回答「看哪一段」，而不是让人对着一片星海发呆。
