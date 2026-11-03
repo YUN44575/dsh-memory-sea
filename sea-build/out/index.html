@@ -3655,8 +3655,10 @@
     // --- 选中的星 → 相关记忆的放射线：一眼看出"它们跟它是什么关系" ---
     if (selIdx >= 0 && relatedSet && cam.s > 0.9) {
       var sn = NODES[selIdx];
-      // 屏幕距离上限：太远的线会横穿整片海，反而看不清
-      var RLINE = 420;
+      // 屏幕距离上限。原来是 420px —— 线会横穿大半个海，路过一堆不相干的星，
+      // 眼睛跟着线走半天也不知道它连到哪颗。收到 170px：线只做"最近这几颗"的指针，
+      // 更远的相关星靠光晕说明关系，不再连过去。
+      var RLINE = 170;
       // 同会话的暖色（时间上挨着）：连最近 8 条，多了就成一束光栅
       var nearTime = [];
       for (var rk of relatedSet) {
@@ -3668,7 +3670,7 @@
         nearTime.push([rd2, rk]);
       }
       nearTime.sort(function (a, b) { return a[0] - b[0]; });
-      var takeT = Math.min(8, nearTime.length);
+      var takeT = Math.min(3, nearTime.length);
       ctx.beginPath();
       ctx.strokeStyle = theme === 'deep' ? 'rgba(255,200,130,.46)' : 'rgba(255,196,140,.50)';
       ctx.lineWidth = 1.25;
@@ -3678,6 +3680,16 @@
         ctx.lineTo(tn.sx, tn.sy);
       }
       ctx.stroke();
+      // 落点：线画到星星边缘就没了，加个实心小点，一眼就知道"连的是它"
+      ctx.beginPath();
+      for (var tp = 0; tp < takeT; tp++) {
+        var tpN = NODES[nearTime[tp][1]];
+        var tpR = 2.5 + (tpN.hi === 1 ? 0.8 : 0);
+        ctx.moveTo(tpN.sx + tpR, tpN.sy);
+        ctx.arc(tpN.sx, tpN.sy, tpR, 0, 6.2832);
+      }
+      ctx.fillStyle = theme === 'deep' ? 'rgba(255,214,158,.88)' : 'rgba(226,158,92,.86)';
+      ctx.fill();
       // 纯语义近邻：冷色
       var near = [];
       for (var rk2 of relatedSet) {
@@ -3690,7 +3702,7 @@
         near.push([d2, rk2]);
       }
       near.sort(function (a, b) { return a[0] - b[0]; });
-      var take = Math.min(8, near.length);
+      var take = Math.min(2, near.length);
       ctx.beginPath();
       // 冷色这条比背景的星座线亮一档，否则两种青蓝混在一起分不出来
       ctx.strokeStyle = theme === 'deep' ? 'rgba(150,205,255,.42)' : 'rgba(190,172,255,.46)';
@@ -3701,6 +3713,35 @@
         ctx.lineTo(nn.sx, nn.sy);
       }
       ctx.stroke();
+      ctx.beginPath();
+      for (var np = 0; np < take; np++) {
+        var npN = NODES[near[np][1]];
+        var npR = 2.4 + (npN.hi === 1 ? 0.8 : 0);
+        ctx.moveTo(npN.sx + npR, npN.sy);
+        ctx.arc(npN.sx, npN.sy, npR, 0, 6.2832);
+      }
+      ctx.fillStyle = theme === 'deep' ? 'rgba(176,220,255,.86)' : 'rgba(132,120,206,.82)';
+      ctx.fill();
+      // 上面只画了最近的几条当"指针"。光标停在任意一颗相关星上时，
+      // 再把「选中星 → 这一颗」单独点亮一条：想看哪条看哪条，不用一堆线互相打。
+      if (hoverIdx >= 0 && hoverIdx !== selIdx && relatedSet.has(hoverIdx) && NODES[hoverIdx].vis) {
+        var hn = NODES[hoverIdx];
+        var isSameSess = hn.sid === sn.sid;
+        ctx.beginPath();
+        ctx.moveTo(sn.sx, sn.sy);
+        ctx.lineTo(hn.sx, hn.sy);
+        ctx.strokeStyle = isSameSess
+          ? (theme === 'deep' ? 'rgba(255,208,150,.90)' : 'rgba(226,158,92,.86)')
+          : (theme === 'deep' ? 'rgba(176,220,255,.86)' : 'rgba(132,120,206,.84)');
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.beginPath();
+        var hpR = 3.2 + (hn.hi === 1 ? 0.8 : 0);
+        ctx.moveTo(hn.sx + hpR, hn.sy);
+        ctx.arc(hn.sx, hn.sy, hpR, 0, 6.2832);
+        ctx.fillStyle = isSameSess ? 'rgba(255,214,158,.96)' : 'rgba(190,228,255,.94)';
+        ctx.fill();
+      }
       // 关系在流动：每条线上跑一颗小光点，方向是「选中星 → 相关星」。
       // 静止的细线只说明"有关系"，会动的点才说明"从它流向哪"。
       var flowT = theme === 'deep' ? '255,214,152' : '158,100,42';
