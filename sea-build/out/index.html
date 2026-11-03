@@ -509,6 +509,18 @@
     font-size: 10.5px; padding: 3px 9px; border-radius: 999px;
     border: 1px solid var(--line); color: var(--dim); letter-spacing: .05em;
   }
+  #dxrel { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 16px; }
+  #dxrel .t { font-size: 10px; letter-spacing: .22em; color: var(--dim); margin-bottom: 12px; }
+  #dxrel .dxh { font-size: 10.5px; color: var(--dim); margin-bottom: 8px; line-height: 1.6; }
+  .dxitem {
+    padding: 7px 0; border-bottom: 1px solid var(--line); cursor: pointer;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .dxitem:last-child { border-bottom: none; }
+  .dxitem:hover .dxt { color: var(--tx); }
+  .dxs { font-size: 9.5px; color: var(--dim); letter-spacing: .04em; }
+  .dxs b { color: var(--mid); font-weight: normal; }
+  .dxt { font-size: 11.5px; color: var(--mid); line-height: 1.55; }
   #drel { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 16px; }
   #drel .t { font-size: 10px; letter-spacing: .22em; color: var(--dim); margin-bottom: 12px; }
   .rel { display: flex; gap: 10px; padding: 7px; border-radius: 8px; cursor: pointer; transition: background .2s; }
@@ -615,6 +627,19 @@
   body[data-theme="shallow"] #guide .ln.lg { background: rgba(180, 210, 255, .55); }
   body[data-theme="shallow"] #guide .ln.lc { background: rgba(186, 214, 255, .8); }
   #guide .gfoot .btn { cursor: pointer; }
+  /* 时间入口：一进来就能问「看哪一段」 */
+  #tchips { display: flex; align-items: center; gap: 4px; margin-top: 9px; font-size: 10.5px; flex-wrap: wrap; }
+  #tchips .tc {
+    cursor: pointer; color: #7f9cb8; padding: 2px 8px; border-radius: 5px;
+    border: 1px solid transparent; transition: all .16s;
+  }
+  #tchips .tc:hover { color: #dff1ff; background: rgba(60, 110, 160, .2); border-color: rgba(100, 160, 210, .32); }
+  #tchips .tc b { color: #9fd4ff; font-weight: normal; font-variant-numeric: tabular-nums; margin-left: 3px; }
+  #tchips .tgo { margin-left: 6px; color: #5f7e9c; padding: 2px 6px; border-radius: 5px; cursor: pointer; }
+  #tchips .tgo:hover { color: #cfe8fb; background: rgba(60, 110, 160, .2); }
+  body[data-theme="shallow"] #tchips .tc:hover { color: #f7e0cc; background: rgba(160, 105, 60, .2); border-color: rgba(210, 160, 110, .32); }
+  body[data-theme="shallow"] #tchips .tc b { color: #f2c9a0; }
+
   /* 开机遮罩：data.js 加载与首帧铺开之前的过渡；也兼作「还没有数据」的提示 */
   #boot {
     position: fixed; inset: 0; z-index: 9995; display: flex; align-items: center; justify-content: center;
@@ -729,6 +754,11 @@
     padding:7px 12px;color:#dbeaf8;font-size:12px;outline:none;font-family:inherit}
   #mgq:focus{border-color:#2f5c8a}
   .mgc{font-size:11px;color:#6c8aa8;font-variant-numeric:tabular-nums}
+  .mgio{background:transparent;border:1px solid #1d3250;color:#9db8d0;font-size:10.5px;
+    padding:3px 9px;border-radius:5px;cursor:pointer;margin-left:auto;letter-spacing:.04em}
+  .mgio + .mgio{margin-left:6px}
+  .mgio:hover{border-color:#2c5c8a;color:#dff1ff;background:rgba(60,110,160,.12)}
+  .mgc{margin-left:6px}
   .mgx{margin-left:auto;cursor:pointer;color:#7d9cb8;font-size:15px;padding:2px 8px}
   .mgx:hover{color:#dff1ff}
   .mgr{display:flex;align-items:center;gap:12px;padding:8px 20px;border-bottom:1px solid #101c2b;
@@ -892,6 +922,7 @@
       <button class="zb" id="tagbar" hidden><i class="dot" style="background:#8fe6c4"></i><span class="tch"></span><b class="tx">×</b></button>
       <button class="zb hlpb" id="helpbtn" title="这片海怎么看：星、线、意识流分别是啥">?</button>
     </div>
+    <div id="tchips"></div>
   </div>
   <div id="searchwrap">
     <label id="search">
@@ -922,6 +953,8 @@
   <div class="mgh">
     <span class="mgt">整理 · 全部记忆</span>
     <input id="mgq" placeholder="搜内容 / 会话 / 标签 / 备注…">
+    <button class="mgio" id="mgexp" title="把收藏 / 标签 / 备注 / 隐去 / 归档导出成一个文件，换机器也能带走">导出</button>
+    <button class="mgio" id="mgimp" title="从之前导出的文件恢复">导入</button>
     <span class="mgc" id="mgcount"></span>
     <b class="mgx" id="mgclose" title="收起">✕</b>
   </div>
@@ -1009,6 +1042,10 @@
       <textarea id="dnote" rows="2" placeholder="写一句备忘，只存在你自己的浏览器里…"></textarea>
       <div class="nfoot"><span id="dnoteState"></span><span class="hintk">⌘/Ctrl + Enter 保存</span></div>
     </div>
+    <div id="dxrel" style="display:none">
+      <div class="t">这件事，别处也提过</div>
+      <div id="dxlist"></div>
+    </div>
     <div id="drel" style="display:none">
       <div class="t">这段对话里，前后几条</div>
       <div id="drelist"></div>
@@ -1051,57 +1088,50 @@
     </div>
     <div class="gbody">
       <div class="gsec">
-        <h4>一颗星 = 一段交流</h4>
-        <p>你说的一句话、我回的一段，都收成一颗星。点它 → 右边出全文。<b>星越大</b>＝这条你反复提过、留得越深；外面有<b>虚线圈</b>＝被标成了长期记忆。</p>
+        <h4>三种问法，按你还记得的东西挑</h4>
+        <p>· 记得<b>一句话</b> → 上面搜索框，输任意几个字<br>
+           · 记得<b>大概什么时候</b> → 标题下面「今天 / 最近 7 天 / 最近 30 天」，点了直接出那一段的回顾<br>
+           · 记得<b>在哪个对话里</b> → 左栏点那一段，属于它的星会亮起来</p>
       </div>
       <div class="gsec">
-        <h4>左边那列「意识流」= 你的会话</h4>
-        <p>每一条就是 DSH 里的一段对话，按你自己建的工作区分组（鲸鲸的房间 / QQ 聊天 / 工作…）。<b>点一段</b> → 海里属于它的那串星亮起来，右边列出整段对话的时间线，点任一条跳到那颗星。</p>
+        <h4>一颗星 = 一句话</h4>
+        <p>谁说的看颜色：<i class="sw wrk"></i>我的回复、<i class="sw cmp"></i>你说的话、QQ、团队协作、世界日记…<br>
+           星越大＝这条反复提过；外面的<b>虚线圈</b>＝被标成了长期记忆；越亮＝越近，暗下去的是正在变远的。</p>
       </div>
       <div class="gsec">
-        <h4>两片海，两层</h4>
-        <p><i class="sw wrk"></i><b>工作海</b>（青蓝）：干活、排障、写东西<br>
-           <i class="sw cmp"></i><b>陪伴海</b>（粉紫）：鲸鲸的房间、QQ 里聊的那些<br>
-           还能切<b>两层</b>。两片海说的不是同一件事：<br>
-           · <b>她的记忆</b>（SurfCore）有真的遗忘机制 → <b>深层</b>＝还记得的，<b>浅层</b>＝正在淡忘的<br>
-           · <b>DSH 会话</b>只是聊天记录、按时间排 → <b>近岸</b>＝最近几天说的，<b>远洋</b>＝更早说的</p>
+        <h4>点开一颗星</h4>
+        <p>右边出全文、标签、备注。下面还会列出两组：<br>
+           <b>这件事，别处也提过</b> —— 别的对话里说得像的几条，点一下跳过去<br>
+           <b>这段对话里，前后几条</b> —— 把这句话放回上下文<br>
+           键盘 <b>← →</b> 在相邻的星之间走，<b>Esc</b> 一层层退。</p>
       </div>
       <div class="gsec">
-        <h4>星点之间的线，分别是这三样</h4>
-        <p><i class="ln lg"></i><b>淡青星座线</b>：语义相近的记忆自动连起来（放大 1.5 倍以上才出现）<br>
-           <i class="ln lw"></i><b>暖金放射线</b>（点星后出现）：同一段对话里、时间上挨着的几条<br>
-           <i class="ln lc"></i><b>冷蓝放射线</b>（点星后出现）：内容说得像、但不在同一段对话里<br>
-           线上跑的小光点，方向是「从这颗星 → 它连着的记忆」。</p>
+        <h4>整理：星图不适合动手</h4>
+        <p>右上角<b>整理</b>是另一种看法 —— 一条一行、能搜、能排序、能按会话折叠、能多选，
+           整批收藏 / 隐去 / 打标签。<br>
+           旁边<b>体检</b>把这堆记忆的状态摊成数字，<b>每张卡都能点</b>：点「重复」就只看重复的那些。<br>
+           <b>回顾</b>选一段时间出一张卡：那几天什么样、哪句后来再没提过、发过哪些图。</p>
       </div>
       <div class="gsec">
-        <h4>想看「到底谁在说」</h4>
-        <p>右上角<b>来源</b>：可以只留某一类 —— 你说的话、我的回复、QQ、
-           <b>团队协作</b>（子代理和 Lead 之间来回的那些结论，以前根本看不到）、
-           世界自己记的<b>生活</b>与<b>旧事</b>、还有世界自己写的<b>日记</b>（它第一人称记的，不是聊天记录）。<br>
-           面板底下那行<b>隐藏层</b>是 2000 多条系统消息（插件规则、时间上下文、审批流水）：
-           它们数量比真对话还多，画成星就是噪音，所以不上星 —— 但一条都没丢，能翻、能搜。<br>
-           某颗星点开后，如果底下多一行「这件事世界那边也记了一笔」，
-           说明同一句话在世界那边也留下了一条记录 —— 两边的说法可以对上。</p>
+        <h4>带走</h4>
+        <p>整理页顶上的<b>导出</b>：收藏 / 标签 / 备注 / 隐去 / 归档存成一个文件，换机器点<b>导入</b>就回来了。<br>
+           记忆本体在 <code>.dsh</code> 里，重装后跑一条 <code>node sea-build/setup.mjs</code> 就重建，不用备份。</p>
       </div>
       <div class="gsec">
-        <h4>想动手整理，别用星图</h4>
-        <p>星图适合「看一眼形状」，不适合「真去整理」。右上角<b>整理</b>打开的是另一种看法：
-           一条一行、能搜、能排序、能多选，整批收藏 / 隐去 / 打标签。<br>
-           旁边<b>体检</b>页把这堆记忆的状态摊成几个数字：多少条、多少张图、多少重复、
-           多少条世界那边也记了一笔、各类来源各占多少 —— 一眼就知道哪里是空的、哪里堆得太多。<br>
-           收藏、标签、备注会跟着记忆本身走（按稳定 id 存），换台机器、重新生成星图都不会丢。</p>
+        <h4>看不到某些东西？</h4>
+        <p>① 右上<b>来源</b>：把去掉勾的来源勾回来<br>
+           ② 右上<b>近岸 / 远洋</b>：换一层<br>
+           ③ 被隐去的：「整理」里勾上「看隐去的」</p>
       </div>
       <div class="gsec">
-        <h4>三种看海的方式</h4>
-      <p><b>往后看</b>：拖到 +30 / +90 / +365 天，星会按 SurfCore 的衰减规则一颗颗变成空心环 ——
-      现在还在的东西，多少天之后会没。<br>
-      <b>情绪</b>：只看心里有过波澜的那些（`emotional` 浓度 ≥ 1），平静的 221 条沉下去，剩下的烧起来。<br>
-      <b>换一片海</b>：左上角虚线按钮在「DSH 会话」和「SurfCore 记忆」之间切。</p>
-
-      <h4>手怎么用</h4>
-        <p>左键拖＝移动整片海　右键拖＝转视角　滚轮＝缩放<br>
-           <b>Shift + 拖</b>＝框选一批（可以整批收藏 / 隐去 / 打标签）<br>
-           <b>Esc</b>＝退出详情　顶栏 <b>⋯</b> 里还有「待复看」「记忆管理」</p>
+        <h4>给 AI 用</h4>
+        <p>这个插件也给 AI 开了几个工具：按关键词回忆、回顾某一天、找某段对话、标星。
+           所以可以直接问 AI「我们之前是不是聊过 X」。</p>
+      </div>
+      <div class="gsec">
+        <h4>手怎么用</h4>
+        <p>左键拖＝移动　右键拖＝转视角　滚轮＝缩放　<b>Shift + 拖</b>＝框选一批<br>
+           顶栏那四个「换一种看法」（往后看 / 重叠 / 年轮 / 情绪）都是临时换个角度，再点一次回来。</p>
       </div>
     </div>
     <div class="gfoot">
@@ -4562,6 +4592,59 @@
   }
 
   /** 从浮层里跳过去看某一颗星（整理/回顾/体检里所有"点一下"都走这里） */
+  /**
+   * 「这件事，别处也提过」—— 把 computeRelated 里落在别的会话的那几颗挑出来。
+   * 星图上它们本来就亮着（相关星），但一片星点里看不出「哪个是别的会话」，
+   * 所以在详情里排成一行行的，点一下跳过去。按离当前这条的时间远近排序。
+   */
+  function renderCrossRel(idx) {
+    var box = document.getElementById('dxrel');
+    var list = document.getElementById('dxlist');
+    if (!box || !list) return;
+    var n = NODES[idx];
+    if (!n || !relatedSet) { box.style.display = 'none'; return; }
+    var rows = [];
+    relatedSet.forEach(function (d) {
+      if (d === idx) return;
+      var m = NODES[d];
+      if (!m || m.src_ === 'sc') return;
+      if (m.sid === n.sid) return;              // 同一段对话的，上面「前后几条」已经有了
+      if (marks.hide[nkey(d)]) return;
+      rows.push(d);
+    });
+    rows.sort(function (a, b) {
+      return Math.abs(NODES[a].t - n.t) - Math.abs(NODES[b].t - n.t);
+    });
+    rows = rows.slice(0, 5);
+    list.innerHTML = '';
+    if (!rows.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    rows.forEach(function (d) {
+      var m = NODES[d];
+      var sv = SESS[m.sid];
+      var title = (sv && sv.title) ? sv.title : '另一段对话';
+      var gap = m.t - n.t;
+      var ago = gap === 0 ? '同一时刻'
+        : (gap > 0 ? '+' + fmtGap(gap) : '-' + fmtGap(-gap));
+      var row = document.createElement('div');
+      row.className = 'dxitem';
+      row.innerHTML = '<span class="dxs">' + esc(title) + ' · <b>' + ago + '</b></span>'
+        + '<span class="dxt">' + esc((m.txt || '（图）').replace(/\s+/g, ' ').slice(0, 72)) + '</span>';
+      row.onclick = function () { goNode(d); };
+      list.appendChild(row);
+    });
+  }
+
+  /** 把毫秒差说成人话：'3 分钟' / '2 小时' / '5 天' */
+  function fmtGap(ms) {
+    var m = ms / 60000;
+    if (m < 1) return '刚刚';
+    if (m < 60) return Math.round(m) + ' 分钟';
+    var h = m / 60;
+    if (h < 24) return Math.round(h) + ' 小时';
+    return Math.round(h / 24) + ' 天';
+  }
+
   function goNode(idx) {
     closeMgmt();
     if (revealNode(idx)) {
@@ -4679,6 +4762,7 @@
     }
     buildEcho(idx);
     for (var ei = 0; ei < N; ei++) if (echoDist[ei] >= 0) relatedSet.add(ei);
+    renderCrossRel(idx);
     refreshFilter();
     if (!rapid) focusOn(idx);
     else if (cam.s > 2.2) {
@@ -4999,7 +5083,11 @@
     document.getElementById('guideOk').onclick = function () { shut(1); };
     g.addEventListener('click', function (e) { if (e.target === g) shut(1); });
     var hb = document.getElementById('helpbtn');
-    if (hb) hb.onclick = function () { g.classList.add('open'); };
+    if (hb) hb.onclick = function () {
+      // 帮助和引导别叠在一起：先收掉引导再开说明
+      try { document.getElementById('tour').classList.remove('on'); } catch (e) {}
+      g.classList.add('open');
+    };
     // 第一次来不直接甩一整篇说明（读不完也不知道从哪下手），
     // 改成四步「跟点」：说到哪个元素，就把哪个元素框出来。
     var TOUR = [
@@ -6531,6 +6619,10 @@
     var now = (typeof SEA !== 'undefined' && SEA.t1) ? SEA.t1 : Date.now();
     var t0 = (typeof SEA !== 'undefined' && SEA.t0) ? SEA.t0 : now - 30 * 864e5;
     if (rvPreset === 'all') return [t0, now];
+    if (rvPreset === 'today') {
+      var d0 = new Date(now); d0.setHours(0, 0, 0, 0);
+      return [Math.max(t0, d0.getTime()), now];
+    }
     if (rvPreset === '30') return [Math.max(t0, now - 30 * 864e5), now];
     if (rvPreset === '7') return [Math.max(t0, now - 7 * 864e5), now];
     return [rvFrom || Math.max(t0, now - 7 * 864e5), rvTo || now];
@@ -6669,6 +6761,7 @@
 
     // 时间选择
     h += '<div class="rvbar">';
+    h += '<button class="rvbtn' + (rvPreset === 'today' ? ' on' : '') + '" data-rv="today">今天</button>';
     h += '<button class="rvbtn' + (rvPreset === '7' ? ' on' : '') + '" data-rv="7">最近 7 天</button>';
     h += '<button class="rvbtn' + (rvPreset === '30' ? ' on' : '') + '" data-rv="30">最近 30 天</button>';
     h += '<button class="rvbtn' + (rvPreset === 'all' ? ' on' : '') + '" data-rv="all">全部</button>';
@@ -6822,6 +6915,57 @@
   // 管理态：先把旧版（键=下标）翻译成稳定 id，再跟 host 的 marks.json 对一次
   migrateMarks();
   syncMarksFromHost();
+  // 整理页顶栏的导出 / 导入：和收藏夹里那两个是同一套动作，只是放在更显眼的地方
+  (function () {
+    var ex = document.getElementById('mgexp');
+    var im = document.getElementById('mgimp');
+    var fl = document.getElementById('shfile');
+    if (ex) ex.onclick = function (ev) { ev.stopPropagation(); exportMarks(); };
+    if (im) im.onclick = function (ev) {
+      ev.stopPropagation();
+      if (fl) fl.click();
+    };
+  })();
+
+  // 时间入口：一进来先回答「看哪一段」，而不是让人对着一片星海发呆。
+  // 数字是「全库」的条数（不受当前层/来源筛选影响），点了直接开那一段的回顾。
+  (function () {
+    var el = document.getElementById('tchips');
+    if (!el) return;
+    var now = (SEA && SEA.t1) ? SEA.t1 : Date.now();
+    function todayStart() { var d = new Date(now); d.setHours(0, 0, 0, 0); return d.getTime(); }
+    function cnt(from) {
+      var c = 0;
+      for (var i = 0; i < N; i++) {
+        var n = NODES[i];
+        if (n.src_ === 'sc') continue;
+        if ((n.t || 0) >= from) c++;
+      }
+      return c;
+    }
+    var segs = [
+      { k: 'today', label: '今天', from: todayStart() },
+      { k: '7', label: '最近 7 天', from: now - 7 * 864e5 },
+      { k: '30', label: '最近 30 天', from: now - 30 * 864e5 }
+    ];
+    var h = '';
+    for (var j = 0; j < segs.length; j++) {
+      var c = cnt(segs[j].from);
+      if (!c && segs[j].k === 'today') continue;   // 今天还没说话就不显示，免得摆个 0
+      h += '<span class="tc" data-rvopen="' + segs[j].k + '">' + segs[j].label + '<b>' + c + '</b></span>';
+    }
+    h += '<span class="tgo" data-rvopen="all">看这一段 →</span>';
+    el.innerHTML = h;
+    el.addEventListener('click', function (ev) {
+      var t = ev.target;
+      while (t && t !== el && !t.getAttribute) t = t.parentNode;
+      var k = t && t.getAttribute ? t.getAttribute('data-rvopen') : null;
+      if (!k) return;
+      rvPreset = k;
+      openMgmt('review');
+    });
+  })();
+
   // texts.js 静默预载：不阻塞首屏，加载完自动补全详情与搜索
   if (SEA.tx && SEA.tx.chars > 0 && SEA.tx.chars < 5e6) setTimeout(loadTX, 800);
   setInterval(pollMarks, 8000);

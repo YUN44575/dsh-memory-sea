@@ -922,6 +922,11 @@ function makeMarksIO(root) {
   /** 原子写：先写 .tmp 再 rename，写坏了也不会留下半个文件 */
   async function write(obj) {
     const tmp = file + '.tmp';
+    // 上一版留一份备份：手滑清空、或者导入错文件时还能捞回来
+    try {
+      const prev = await fsp.readFile(file, 'utf8');
+      if (prev && prev.length > 2) await fsp.writeFile(file + '.bak', prev, 'utf8');
+    } catch (e) { /* 第一次写没有旧文件，正常 */ }
     await fsp.writeFile(tmp, JSON.stringify(obj), 'utf8');
     await fsp.rename(tmp, file);
   }
