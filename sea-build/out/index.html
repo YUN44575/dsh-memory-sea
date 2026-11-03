@@ -4271,7 +4271,7 @@
     // --- 会话名标注：全览时告诉人「这团星是哪几段对话」 ---
     // 星图最大的门槛是「看得到形状，不知道形状是谁」。这里只标节点最多的前 8 段，
     // 彼此离得近的让位，避免一屏散着十几个标签谁也看不清。
-    if (layerFade >= 1) drawSessLabels();
+    if (layerFade >= 1 && !viewAnim) drawSessLabels();
   }
 
   var _lblKey = '', _lblList = null;
@@ -4893,6 +4893,12 @@
   }
 
   function selectNode(idx) {
+    // 先把面板推出来（0.42s 滑入），内容在动画进行时再填 —— 点击的反馈在下一帧就开始了，
+    // 不用等下面这一整段 DOM 构建。这是「点了就有」和「点了等一下」的区别。
+    if (idx >= 0 && NODES[idx]) {
+      detail.classList.add('open');
+      document.body.classList.add('panel-open');
+    }
     // 点星之后把 hover 高亮全清掉：不然鼠标扫过一片星，那些星的光圈会一直留着
     for (var _hi = 0; _hi < N; _hi++) { if (NODES[_hi].hlTarget) NODES[_hi].hlTarget = 0; }
     var nowSel = performance.now();
@@ -4981,7 +4987,8 @@
     document.getElementById('hint').classList.add('out');
     // 点一下先让详情出来 —— 关联计算（computeRelated + buildEcho + 跨会话）慢，
     // 放到下一帧做，体感从"点了等一下"变成"点了就有"。
-    requestAnimationFrame(function () {
+    // 再往后推 70ms：让面板滑入动画先起步，重活别在动画第一帧抢主线程。
+    setTimeout(function () {
       // 只留相关的记忆（同会话 + 语义相近），其余隐去
       relatedSet = computeRelated(idx);
       // 相关星按离选中星的远近排队，越近越先亮 —— 像光从这颗星散出去
@@ -5006,7 +5013,7 @@
       for (var ei = 0; ei < N; ei++) if (echoDist[ei] >= 0) relatedSet.add(ei);
       renderCrossRel(idx);
       refreshFilter();
-    });
+    }, 70);
     if (!rapid) focusOn(idx);
     else if (cam.s > 2.2) {
       // 已经推到近处了：连点时只轻轻把星挪到画面中间，不重设缩放/角度
