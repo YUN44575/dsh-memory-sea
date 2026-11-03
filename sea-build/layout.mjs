@@ -847,7 +847,10 @@ const outNodes = nodes.map((n, i) => {
     x: +px[i].toFixed(5),
     y: +py[i].toFixed(5),
     z: +pz[i].toFixed(5),
-    txt: (n.text || '').slice(0, 600),
+    // 正文只带前 200 字进 data.js：星图渲染、搜索、列表摘要都够用；
+    // 更长的后半截拆到 texts.js 里，点开详情 / 搜索时才加载（首屏少一半体积）。
+    txt: (n.text || '').slice(0, 200),
+    rl: (n.text || '').length,   // 全文长度（> txt 长度说明还有后半截在 texts.js）
     kw,
     hu: hue,
     th: imgs.length ? imgs[0].sha : null,
@@ -965,7 +968,14 @@ const parked = (rawSess || [])
   }));
 console.log('空壳会话', parked.length, '（进 parked 清单，不上星）');
 
-const payload = { builtAt: Date.now(), t0, t1, nodes: outNodes, sessions, islands: outIslands, parked, sys: rawSys || [], proc: rawProc || { think: 0, tool: 0 } };
+// 先算 texts.js 的规模：前端用它决定「静默预载」还是「点开才加载」
+let txCount = 0, txChars = 0;
+for (let i = 0; i < N; i++) {
+  const full = nodes[i].text || '';
+  if (!nodes[i].id || full.length <= 200) continue;
+  txCount++; txChars += full.length - 200;
+}
+const payload = { builtAt: Date.now(), t0, t1, nodes: outNodes, sessions, islands: outIslands, parked, sys: rawSys || [], proc: rawProc || { think: 0, tool: 0 }, tx: { n: txCount, chars: txChars } };
 
 // ---- 6. 星座连线：对「唯一节点」在二维坐标上求近邻边（网格加速，最多 3 个最近邻）----
 {
@@ -1012,6 +1022,21 @@ const payload = { builtAt: Date.now(), t0, t1, nodes: outNodes, sessions, island
 mkdirSync(P.out, { recursive: true });
 const js = 'window.SEA=' + JSON.stringify(payload) + ';';
 writeFileSync(OUT, js, 'utf8');
+// 全文分片：只有超过 200 字的消息才有后半截，按节点稳定 id 索引。前端「点开详情 /
+// 开始搜索」时会动态加载它，所以星图首屏不必背着全部正文。
+{
+  const TX = {};
+  for (let i = 0; i < N; i++) {
+    const full = nodes[i].text || '';
+    const id = nodes[i].id;
+    if (!id || full.length <= 200) continue;
+    TX[id] = full.slice(200);
+  }
+  const TXP = OUT.replace(/data\.js$/, 'texts.js');
+  writeFileSync(TXP, 'window.SEA_TX=' + JSON.stringify(TX) + ';', 'utf8');
+  console.log('texts.js', txCount, '条后半截 |', txChars, '字');
+}
+
 // 分域表：sid（全长）→ 0 工作 / 1 陪伴。
 // Host 半的回忆工具（/sea/api 与 sea_recall）读的是 nodes.json，里面没有分域字段，
 // 又不想让它把 domains.json 那套规则再实现一遍，所以在这里单独吐一份很小的映射。

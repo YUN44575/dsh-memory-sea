@@ -1704,6 +1704,34 @@
   // 📴 存两处：localStorage（离线/双击打开也能用）+ host 的 marks.json（插件里打开时两边共用一份，
   //    以前 file:// 与 http:// 不同源 = 两套管理，就是这个坑）。
   var MARKS_KEY = 'sea.marks.v1';
+  // 正文分片：data.js 里每条只带前 200 字（星图、列表、tip 都够用），
+  // 更长的后半截在 texts.js 里，打开页面后静默补上；补上之前详情会先显示前 200 字。
+  var TX = null, txLoading = false, txWait = [];
+  function txtOf(n) {
+    if (!n) return '';
+    var base = n.txt || '';
+    if (TX && n.id && TX[n.id]) return base + TX[n.id];
+    return base;
+  }
+  function txtLoaded(n) { return !n || !n.rl || n.rl <= (n.txt || '').length || !!(TX && n.id && TX[n.id]); }
+  function loadTX(cb) {
+    if (cb) txWait.push(cb);
+    if (TX || txLoading) { if (TX) { var q = txWait; txWait = []; q.forEach(function (f) { try { f(); } catch (e) {} }); } return; }
+    txLoading = true;
+    var el = document.createElement('script');
+    el.src = 'texts.js?v=' + (SEA.builtAt || 0);
+    el.onload = function () {
+      TX = window.SEA_TX || {};
+      txLoading = false;
+      // 搜索索引里存的是小写正文，全文补上之后要重建一次，否则后半截搜不到
+      for (var j = 0; j < N; j++) { NODES[j].txtLower = txtOf(NODES[j]).toLowerCase(); }
+      if (typeof selIdx !== 'undefined' && selIdx >= 0) selectNode(selIdx);
+      var q = txWait; txWait = [];
+      q.forEach(function (f) { try { f(); } catch (e) {} });
+    };
+    el.onerror = function () { txLoading = false; };
+    document.body.appendChild(el);
+  }
   var marks = { __v: 2, star: {}, hide: {}, note: {}, arch: {}, tag: {} };
   var tagFilter = null;        // 按标签看海：null = 不过滤
   var marksApiOk = (location.protocol === 'http:' || location.protocol === 'https:');
@@ -4460,10 +4488,13 @@
       // 同一句话在世界的对话副本里也有一条：说明它当时真被"过了一遍脑子"
       (n.w ? '<br><i class="wdup">这件事世界那边也记了一笔 · ' + fmtDate(n.w) + '</i>' : '');
 
-    var txt = (n.txt || '').trim();
+    var txt = txtOf(n).trim();
+    // texts.js 还没到：先说清楚"这是前半截，全文在路上"，别让人以为消息就只有这么长
+    if (!txtLoaded(n) && !txLoading) loadTX();
+    var txtTail = (!txtLoaded(n)) ? (' …（全文 ' + (n.rl || 0) + ' 字，正在加载后半截）') : '';
     var mi = maskInfo(txt);
     document.getElementById('dtext').textContent =
-      (revealSet[idx] ? txt : mi.text) || '（这一颗星里没有文字，只有光影。）';
+      ((revealSet[idx] ? txt : mi.text) || '（这一颗星里没有文字，只有光影。）') + txtTail;
     renderSensitive(idx, mi.n);
 
     var tg = document.getElementById('dtags');
@@ -6610,6 +6641,8 @@
   // 管理态：先把旧版（键=下标）翻译成稳定 id，再跟 host 的 marks.json 对一次
   migrateMarks();
   syncMarksFromHost();
+  // texts.js 静默预载：不阻塞首屏，加载完自动补全详情与搜索
+  if (SEA.tx && SEA.tx.chars > 0 && SEA.tx.chars < 5e6) setTimeout(loadTX, 800);
   setInterval(pollMarks, 8000);
   requestAnimationFrame(draw);
 
