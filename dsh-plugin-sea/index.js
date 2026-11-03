@@ -996,9 +996,10 @@ function resolveRoot(configRoot) {
   try {
     const here = fileURLToPath(new URL('.', import.meta.url));
     const guess = normalize(join(here, '..', 'sea-build', 'out'));
-    // 认 data.js 而不是 index.html：仓库里就带着一个空的 index.html，
-    // 那只是壳子；没有 data.js 说明还没跑过 setup，得继续往下找
-    if (existsSync(join(guess, 'data.js'))) return guess;
+    // 只要这个目录存在就认它：仓库/安装包里本来就带 sea-build/out（至少有个 index.html 壳子）。
+    // 不要用「data.js 在不在」当条件 —— DSH 先启动、数据后生成时，root 会被定到别处，
+    // 结果整个 /sea 都是 404。
+    if (existsSync(guess)) return guess;
   } catch {}
   const home = process.env.USERPROFILE || process.env.HOME || '.';
   return normalize(join(home, '.dsh', 'sea-out'));
