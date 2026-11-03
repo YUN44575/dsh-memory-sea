@@ -66,7 +66,16 @@ https://github.com/YUN44575/dsh-memory-sea
 ```
 
 这个仓库根目录本身就是插件包（`package.json` 里声明了 `dsh.bundle`），所以能被直接识别。
-装完左下角出现一个 ✦，点开就是星图；AI 那边同时多出五个工具。
+装完左下角出现一个 ✦，AI 那边同时多出五个工具。
+
+**插件装好不等于有数据** — 它不会自己去读你的会话，得先生成一次。
+到仓库目录（或 `~/.dsh/profiles/<profile>/node_modules/dsh-memory-sea`）里跑：
+
+```bash
+node sea-build/setup.mjs
+```
+
+还没数据时打开星图，画面上会直接告诉你跑这条命令。
 
 > 装之前如果已经装过旧的 `@local/dsh-plugin-sea`，先把它卸掉 —— 两个都装会有两个悬浮球。
 
