@@ -126,7 +126,7 @@ node sea-build/install.mjs --force          # 目录搬过家，覆盖旧的 lin
 **页面上**
 - 星图：会话变成星，相近的话题聚成云，工作海（青蓝）/ 陪伴海（粉紫）分开
 - 点星看原话、缩略图、上下文；Esc 分级退出
-- 右上「来源」：七类来源分别开关，**能看到团队协作、世界日记这些以前根本看不到的**
+- 右上「来源」：按来源分别开关（你说的话 / 我的回复 / QQ / 团队协作…），**能看到团队协作这类平时根本看不到的**
 - 「整理」：清单式检索 + 体检（重复/没再提过/带图）+ 按会话折叠 + 回顾卡（选一段时间生成一张卡）
 - 收藏 / 标签 / 备注 / 隐去 / 归档，全部存在 `marks.json`（不再只是浏览器 localStorage）
 
@@ -134,7 +134,7 @@ node sea-build/install.mjs --force          # 目录搬过家，覆盖旧的 lin
 | 工具 | 干什么 |
 |---|---|
 | `sea_recall` | 翻原话：关键词 / 来源 / 时间段 / 分域 |
-| `sea_surf` | 翻 SurfCore 的**记忆卡**（有重要性、清晰度；没装 SurfCore 就不会挂这个工具） |
+| `sea_surf` | 翻 SurfCore 的**记忆卡**（**附加**：没装 SurfCore 就不会挂这个工具，见 [附加数据源](docs/EXTRA.md)） |
 | `sea_day` | 某天 / 最近几天发生了什么 |
 | `sea_sessions` | 列出会话，找"上次聊 XX 的是哪个" |
 | `sea_mark` | 把某条收藏 / 打标签 / 写备注 / 隐去（写回 `marks.json`，页面 8 秒内自动出现） |
@@ -143,19 +143,28 @@ node sea-build/install.mjs --force          # 目录搬过家，覆盖旧的 lin
 
 ## 数据从哪来、往哪去
 
-只**读**这些地方，不改原始数据：
+只**读**这些地方，不改原始数据。
+
+**核心**（必需，两样）：
 
 | 来源 | 路径 |
 |---|---|
 | DSH 会话存档 | `<DSH>/.dsh/sessions/**/session.v4.jsonl.zstd` |
 | 附件图 | `<DSH>/.dsh/attachments/v1/objects` |
-| 长期记忆 | `<DSH>/.dsh/fish-memory/*.json` |
-| 世界日记 | `<DSH>/.dsh/worlds/default/diary/*.md` + `conversations/*.jsonl` |
-| SurfCore 记忆卡 | `<DSH>/.dsh/surfcore/characters` |
+
+**附加**（可选，有什么接什么）：
+
+| 来源 | 路径 | 文件 |
+|---|---|---|
+| 长期记忆 | `<DSH>/.dsh/fish-memory/*.json` | 多一类来源 |
+| 世界日记 | `<DSH>/.dsh/worlds/default/` | 多一片陪伴海的内容 |
+| SurfCore 记忆卡 | `<DSH>/.dsh/surfcore/characters` | 多一片海 + `sea_surf` |
+
+每个都是独立的，详细说明见 **[附加数据源（可选）](docs/EXTRA.md)**。
 
 产物都在 `sea-build/`：`nodes.json`（采集）、`out/data.js`（星图，长消息只带前 200 字）、`out/texts.js`（长消息的后半截，页面打开 0.8 秒后自动补上）、`out/hidden.js`（系统消息全文）、`out/zones.json`（分域表）、`marks.json`（管理态）。
 
-**没有这些东西也能跑**：缺哪个就少哪一块（`doctor.mjs` 会告诉你怎么回事），不会崩。
+**没有附加的东西也能跑**：缺哪个就少哪一块（`doctor.mjs` 会告诉你怎么回事），不会崩。
 
 ---
 
@@ -226,3 +235,16 @@ dsh-sea-v1.0.0/
 ## 许可
 
 MIT。数据永远在你自己的机器上，没有联网请求。
+
+---
+
+## 还能接什么（可选）
+
+这套东西默认只处理 **DSH 会话本身**。如果你的 DSH 里还装了这些，会多出对应的内容：
+
+- **fish-memory** → 长期记忆条目也上星图，搜索时一起命中
+- **dsh-world**（世界日记）→ 它写的日记进陪伴海，你俩对同一件事的两个视角能对照着看
+- **SurfCore** → 多一片「衰减中的记忆卡」的海，AI 多一个 `sea_surf` 工具
+- **团队协作 / 子代理** → 默认就接（DSH 会话的一部分），能看到 Lead 和子代理来回的那些结论
+
+细分说明（每个源怎么接、没有会怎样、分域怎么调）在 **[docs/EXTRA.md](docs/EXTRA.md)**。

@@ -24,3 +24,6 @@ node_modules/
 Thumbs.db
 *.log
 npm-debug.log*
+
+# 演示数据（mkdemo*.mjs 生成，不进仓库）
+sea-build/out-demo/
