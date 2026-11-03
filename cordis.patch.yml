@@ -1,0 +1,18 @@
+# 记忆意识海 · bundle 装载声明
+#
+# 仓库根就是插件包（package.json 里 dsh.bundle.patch 指向这个文件），
+# 所以 DSH 的「从 Git 仓库安装」能直接认出来；实现代码在 dsh-plugin-sea/ 里，
+# 由 package.json 的 exports 转过去。
+- insert:
+    - id: dsh-memory-sea
+      name: 'dsh-memory-sea'
+      config:
+        # 数据目录（sea-build/out：里面有 index.html / data.js / nodes.json…）
+        # 留空 = 自动找，顺序：
+        #   1. 环境变量 SEA_DATA_DIR
+        #   2. 插件自己旁边：<插件目录>/../sea-build/out（install.mjs 软链安装走这条）
+        #   3. <用户目录>/.dsh/sea-out
+        # 想钉死就写绝对路径，比如 root: 'D:/somewhere/sea-build/out'
+        root: ''
+        # 挂在哪个 URL 前缀下；改这里要同步改 client.js 里的 iframe src
+        prefix: '/sea'

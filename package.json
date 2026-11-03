@@ -1,0 +1,52 @@
+{
+  "name": "dsh-memory-sea",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "把 DSH 里的会话变成一片星图：每条交流一颗星，按来源分色、按时间回看，点开就是原话；可以搜索整理，也能让 AI 查自己的历史。",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "memory",
+    "memory-management",
+    "visualization",
+    "star-map",
+    "local-first"
+  ],
+  "exports": {
+    ".": "./dsh-plugin-sea/index.js",
+    "./client": "./dsh-plugin-sea/client.js",
+    "./locale/*.json": "./dsh-plugin-sea/locale/*.json",
+    "./icon": "./dsh-plugin-sea/icon.svg"
+  },
+  "files": [
+    "dsh-plugin-sea/index.js",
+    "dsh-plugin-sea/client.js",
+    "dsh-plugin-sea/search.js",
+    "dsh-plugin-sea/cordis.patch.yml",
+    "dsh-plugin-sea/locale/*.json",
+    "dsh-plugin-sea/icon.svg",
+    "dsh-plugin-sea/README.md",
+    "cordis.patch.yml",
+    "sea-build/*.mjs",
+    "sea-build/*.json",
+    "sea-build/out/index.html",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs/**/*"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}

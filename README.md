@@ -45,30 +45,38 @@
 
 前置：Node.js ≥ 20、装了 DSH、本机有 Chrome（只影响截图工具，不影响主功能）。
 
-### 1. 把两个目录放到同一个父目录里
-
-```
-<随便一个目录>/
-  dsh-plugin-sea/     ← 插件本体
-  sea-build/          ← 数据管线 + 界面
-```
-
-**必须同级**：`sea-build/synonym-test.mjs` 会 `import '../dsh-plugin-sea/search.js'`。
-
-### 2. 生成数据
+### 1. 生成数据
 
 ```bash
-node sea-build/doctor.mjs    # 先自检：找到几个数据源、缺什么
+node sea-build/doctor.mjs    # 先自检：找到几个数据源、缺什么（可选）
 node sea-build/setup.mjs     # 一条命令跑完整条管线（首次约 3 秒，之后约 2 秒）
 ```
 
 跑完 `sea-build/out/` 里会有 `index.html`、`data.js`、`texts.js`、`zones.json` 等。
-到这里其实就已经能用了（双击 `index.html`）；下面两步是为了**在 DSH 里打开**和**让 AI 能用**。
+到这里其实就已经能用了（双击 `index.html`）；下面一步是为了**在 DSH 里打开**和**让 AI 能用**。
 
-### 3. 装插件（一条命令）
+### 2. 装进 DSH
+
+**方式 A：插件管理器里直接装（推荐）**
+
+打开 DSH → 插件 → 安装 → 在「Git 仓库」里填：
+
+```
+https://github.com/YUN44575/dsh-memory-sea
+```
+
+这个仓库根目录本身就是插件包（`package.json` 里声明了 `dsh.bundle`），所以能被直接识别。
+装完左下角出现一个 ✦，点开就是星图；AI 那边同时多出五个工具。
+
+> 装之前如果已经装过旧的 `@local/dsh-plugin-sea`，先把它卸掉 —— 两个都装会有两个悬浮球。
+
+**方式 B：命令行（clone 下来装）**
 
 ```bash
-node sea-build/install.mjs
+git clone https://github.com/YUN44575/dsh-memory-sea
+cd dsh-memory-sea
+node sea-build/setup.mjs      # 生成数据
+node sea-build/install.mjs    # 装进 DSH
 ```
 
 它会做三件事：往 DSH profile 的 `package.json` 里登记两处（`dependencies` 加一条 `link:`、
@@ -83,7 +91,7 @@ node sea-build/install.mjs --skip-setup     # 只装插件，不重建数据
 node sea-build/install.mjs --force          # 目录搬过家，覆盖旧的 link 指向
 ```
 
-装完在 profile 目录跑一次 `pnpm install`（如果 DSH 启动时自己会装，跳过也行）。
+`install.mjs` 装完在 profile 目录跑一次 `pnpm install`（如果 DSH 启动时自己会装，跳过也行）。
 
 <details>
 <summary>也可以手动装（两处登记）</summary>
