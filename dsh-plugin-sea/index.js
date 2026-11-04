@@ -1040,6 +1040,138 @@ async function getCreateUserMessage() {
   return _cum;
 }
 
+// ── 工作记忆：从用户的话里认出「还没做完的事」。
+// 纯正则、不调模型；最多存 12 条、每轮注入 3 条；3 天没提起就过期；
+// 收尾词（「弄完了」「不用了」）命中就删掉相关的那几条。
+// 单独存 working.json，不进记忆库 —— 它不是「说过的话」，是「还没做的事」。
+const WORK_MAX = 12;
+const WORK_INJECT = 3;
+const WORK_EXPIRE = 3 * 86400000;
+const TODO_RES = [
+  /(?:记得|别忘了|提醒我)([^。！？!?\n]{2,28})/g,
+  /(?:待会|等会|一会儿|等下|晚点|回头)([^。！？!?\n]{2,28})/g,
+  /(?:明天|后天|今晚|下午|晚上)([^。！？!?\n]{2,28})/g,
+  /我(?:得|要|准备)([^。！？!?\n]{2,28})/g,
+];
+const DONE_RE = /(?:好了|弄完了|搞定了|不用了|完成了|做完了|改好了|发过去了|已经[^。！？!?\n]{0,6}了)/;
+// 粘贴的网页不是用户说的话。2026-10-29 的教训：不切掉会把短视频文案当成待办。
+const QUOTE_MARKS = ['[user-selected page text]', '<UNTRUSTED_PAGE_CONTENT', 'Security: Enclosed page content'];
+
+function stripQuoted(s) {
+  let out = String(s == null ? '' : s);
+  for (const m of QUOTE_MARKS) {
+    const i = out.indexOf(m);
+    if (i >= 0) out = out.slice(0, i);
+  }
+  return out;
+}
+
+function bigramSet(s) {
+  const t = String(s == null ? '' : s).replace(/\s+/g, '').toLowerCase();
+  const set = new Set();
+  for (let i = 0; i < t.length - 1; i++) set.add(t.slice(i, i + 2));
+  return set;
+}
+
+function workPath(root) {
+  return join(root, '..', 'working.json');
+}
+
+async function loadWork(root) {
+  try {
+    const p = workPath(root);
+    if (!existsSync(p)) return [];
+    const o = JSON.parse(await fsp.readFile(p, 'utf8'));
+    const items = Array.isArray(o && o.items) ? o.items : [];
+    return items.filter((x) => x && typeof x.text === 'string' && x.at);
+  } catch {
+    return [];
+  }
+}
+
+async function saveWork(root, items) {
+  try {
+    const p = workPath(root);
+    const tmp = p + '.tmp';
+    await fsp.writeFile(tmp, JSON.stringify({ items, updated: Date.now() }, null, 2), 'utf8');
+    await fsp.rename(tmp, p);
+  } catch (e) {
+    console.warn('[sea] 工作记忆写不进去（不影响回答）：' + (e && e.message ? e.message : e));
+  }
+}
+
+// 更新并返回该注入的那几条。几十微秒，纯正则。
+async function updateWork(root, said) {
+  const prev = await loadWork(root);
+  const now = Date.now();
+  const text = stripQuoted(said);
+  let items = prev.filter((x) => now - x.at < WORK_EXPIRE);
+
+  // 收尾词：和这句话相关的待办删掉（bigram 有交集就算 —— 「猫粮已经买好了」
+  if (DONE_RE.test(text)) {
+    const bg = bigramSet(text);
+    items = items.filter((x) => {
+      let hit = 0;
+      for (const g of bigramSet(x.text)) if (bg.has(g)) hit++;
+      return hit < 1;
+    });
+  }
+
+  // 捞新的
+  for (const re of TODO_RES) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) && items.length < WORK_MAX) {
+      const t = String(m[1] || '').trim();
+      if (t.length < 2) continue;
+      // 「提醒我明天买猫粮」会被两条正则各抓一次（\"明天买猫粮\" / \"买猫粮\"）。
+      // 互相包含就并成更长的那个，否则同一件事会列两行。
+      const dup = items.findIndex((x) => x.text === t || x.text.includes(t) || t.includes(x.text));
+      if (dup >= 0) {
+        if (t.length > items[dup].text.length) items[dup] = { text: t, at: now };
+        continue;
+      }
+      items.push({ text: t, at: now });
+    }
+  }
+
+  items = items.slice(-WORK_MAX);
+  if (JSON.stringify(items) !== JSON.stringify(prev)) await saveWork(root, items);
+  return items.slice(-WORK_INJECT);
+}
+
+// ── 海马体：最近两天的原话（一小扇窗）。
+// 全库检索解决「找得到」，它解决「在场感」——模型知道刚才在聊什么。
+// 只在用户提到过去时才注入，限 4 条 × 50 字（约 130 token）。
+function hippocampus(d, now) {
+  try {
+    const since = now - 2 * 86400000;
+    const list = [];
+    for (const n of (d && d.nodes) || []) {
+      if (n.src !== 'user' && n.src !== 'qq') continue;
+      if (!n.time || n.time < since || n.time > now - 60000) continue;
+      const s = String(n.text || '').replace(/\s+/g, ' ').trim();
+      if (s.length < 4) continue;
+      list.push({ t: n.time, s: s.slice(0, 50) });
+    }
+    if (!list.length) return '';
+    list.sort((a, b) => b.t - a.t);
+    const picked = [];
+    for (const it of list) {
+      if (picked.length >= 4) break;
+      if (picked.some((p) => p.s === it.s)) continue;
+      picked.push(it);
+    }
+    if (!picked.length) return '';
+    return ['<system-reminder>', '你最近说过：']
+      .concat(picked.map((p) => '\u00b7 ' + p.s))
+      .concat(['</system-reminder>'])
+      .join('\n');
+  } catch (e) {
+    return '';
+  }
+}
+
 export function apply(ctx, config) {
   const root = resolveRoot(config?.root);
   const prefix = String(config?.prefix || '/sea');
@@ -1320,7 +1452,31 @@ export function apply(ctx, config) {
             const first = turn === 1;
             const hit = last ? WORD_RE.test(last) : false;
             const base = first ? FULL : SHORT;
-            const text = hit ? base + '\n' + TRIGGER : base;
+            let text = base;
+            // 提到过去：加一句「先查再说」，再给一小扇「最近原话」的窗
+            if (hit) {
+              text += '\n' + TRIGGER;
+              try {
+                const hip = hippocampus(await reader.load(), Date.now());
+                if (hip) text += '\n' + hip;
+              } catch (e) {
+                console.warn('[sea] 海马体没读上（不影响回答）：' + (e?.message || e));
+              }
+            }
+            // 工作记忆：有「还没做完的事」才加，没有就不加
+            try {
+              const todo = await updateWork(root, last);
+              if (todo.length) {
+                text += '\n' + [
+                  '<system-reminder>',
+                  '这几件事你说过还没做完：',
+                  ...todo.map((x) => '\u00b7 ' + String(x.text).slice(0, 40)),
+                  '</system-reminder>',
+                ].join('\n');
+              }
+            } catch (e) {
+              console.warn('[sea] 工作记忆没读上（不影响回答）：' + (e?.message || e));
+            }
             try {
               return {
                 kind: 'enter',
