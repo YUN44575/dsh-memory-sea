@@ -1444,10 +1444,14 @@ export function apply(ctx, config) {
             const msgs = Array.isArray(decision.messages) ? decision.messages : [];
             let last = '';
             for (let i = msgs.length - 1; i >= 0; i--) {
-              if (msgs[i] && msgs[i].role === 'user') {
-                last = textOf(msgs[i]);
-                break;
-              }
+              const m = msgs[i];
+              if (!m || m.role !== 'user') continue;
+              // 跳过插件自己注入的提醒：它们的 role 也是 user，
+              // 不跳过的话下一轮会把「提醒」当成「用户刚说的话」，触发词就永远命不中。
+              const k = m && m.source && m.source.kind;
+              if (typeof k === 'string' && k.startsWith('plugin:')) continue;
+              last = textOf(m);
+              break;
             }
             const first = turn === 1;
             const hit = last ? WORD_RE.test(last) : false;
