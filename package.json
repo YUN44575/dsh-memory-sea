@@ -29,6 +29,7 @@
     "cordis.patch.yml",
     "sea-build/*.mjs",
     "sea-build/*.json",
+    "sea-build/src/**/*",
     "sea-build/out/index.html",
     "README.md",
     "CHANGELOG.md",

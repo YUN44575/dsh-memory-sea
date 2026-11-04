@@ -224,6 +224,11 @@ dsh-sea-v1.0.0/
 │   └── README.md          插件详细文档（工具参数、检索原理、配置）
 └── sea-build/             ← 数据管线 + 界面
     ├── out/index.html     界面本体（星图 / 整理 / 详情，纯前端无依赖）
+    ├── src/               界面源码（改这个，不要直接改 out/index.html）
+    │   ├── shell.html        HTML 骨架（CSS / JS 各留一个占位）
+    │   ├── style.css         样式
+    │   └── js/               42 个脚本，按文件名序号拼接
+    ├── build.mjs          src/ 拼回 out/index.html（`node sea-build/build.mjs`）
     ├── collect.mjs        采集会话 + 记忆卡 + 日记 → nodes.json
     ├── layout.mjs         语义分岛布局 → out/data.js + out/texts.js + out/zones.json（增量：旧星不复位）
     ├── build_sc.mjs       SurfCore 记忆卡 → out/sc-data.js
@@ -243,9 +248,30 @@ dsh-sea-v1.0.0/
 |---|---|
 | 哪些会话算「陪伴海」 | `sea-build/domains.json`（改完跑 setup） |
 | 搜不到的词 | `sea-build/sea.config.json` 的 `synonyms`（跑 synonym-test 看哪些 ✗） |
-| 界面文字/颜色 | `sea-build/out/index.html` |
+| 界面文字/颜色 | `sea-build/src/`（改完跑 `node sea-build/build.mjs`）|
 | 工具行为 | `dsh-plugin-sea/index.js`（改完**重启 DSH**） |
 | 数据目录 | `dsh-plugin-sea/cordis.patch.yml` 的 `root` |
+
+### 为什么界面要拆成 `src/`
+
+`out/index.html` 是**产物**，七千多行单文件 —— 它能双击直接开，但改起来痛苦：改一个函数要在七千行里找，容易碰到隔壁。
+
+所以源码拆开：
+
+```
+src/shell.html   骨架，CSS 和 JS 各留一个占位符
+src/style.css    全部样式
+src/js/          42 个文件，按功能切，顺序由文件名前三位数字决定（010、020…）
+```
+
+`build.mjs` 把它们拼回 `out/index.html`，**产物和拆分前字节级一致**，所以行为没有任何变化。
+
+```bash
+node sea-build/build.mjs           # 拼一次
+node sea-build/build.mjs --check   # 只比对不写盘（检查 src 改了有没有忘记 build）
+```
+
+要加代码就在 `src/js/` 里按序号插（比如 `155-新功能.js`），或直接改现有文件。**别直接改 `out/index.html`** —— 下次 build 会覆盖掉。
 
 ---
 

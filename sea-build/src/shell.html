@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>记忆意识海</title>
+<style>
+/*@@CSS@@*/
+</style>
+</head>
+<body data-theme="deep">
+<div id="boot">
+  <div class="bc">
+    <div class="bs">正在铺开星图…</div>
+    <div class="bt">第一次打开会慢一点，之后就快了。</div>
+    <div class="bdots"><i></i><i></i><i></i></div>
+  </div>
+</div>
+
+<canvas id="sea"></canvas>
+
+<div class="hud" id="topbar">
+  <div id="brand">
+    <h1>记忆意识海</h1>
+    <div class="sub" id="statsub"></div>
+    <div id="zonebar">
+      <button class="zb src" id="srcbtn" title="换一片海看">DSH 会话</button>
+      <button class="zb fut" id="futbtn" title="往后拖，看这片海会变成什么样">往后看</button>
+        <button class="zb ovl" id="ovlbtn" title="把两片海摆在一起：同一件事的两头，牵一根线">重叠</button>
+        <button class="zb rng" id="ringbtn" title="换成时间看：圆心是现在，往外一圈一圈是更早的日子">年轮</button>
+        <button class="zb emo" id="emobtn" title="按情绪看：热的上色浮起，平静的沉下去">情绪</button>
+      <button class="zb on" data-zone="-1">全部</button>
+      <button class="zb" data-zone="0"><i class="dot" style="background:#7fdcff"></i>工作海</button>
+      <button class="zb" data-zone="1"><i class="dot" style="background:#ff9ec0"></i>陪伴海</button>
+      <button class="zb" id="tagbar" hidden><i class="dot" style="background:#8fe6c4"></i><span class="tch"></span><b class="tx">×</b></button>
+      <button class="zb hlpb" id="helpbtn" title="这片海怎么看：星、线、意识流分别是啥">?</button>
+    </div>
+    <div id="tchips"></div>
+  </div>
+  <div id="searchwrap">
+    <label id="search">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="7" cy="7" r="4.6"/><path d="M10.6 10.6 L14 14"/>
+      </svg>
+      <input id="q" type="text" placeholder="输入一句话，点亮相似的记忆" autocomplete="off" spellcheck="false">
+      <span class="cnt" id="qcnt"></span>
+    </label>
+  </div>
+  <div id="tools">
+    <button class="btn" id="srcf" title="按来源看：谁说的话上星（团队协作、世界生活都在里面）">来源</button>
+    <button class="btn" id="shbtn" title="我的收藏 / 已隐去的记忆">☆ 收藏 <b id="shcnt">0</b></button>
+    <button class="btn" id="tk" title="深海 · 沉下来的深层记忆">深层</button>
+    <button class="btn adv on" id="fg" title="遗忘曲线：旧记忆会随时间变淡，重要的事不会">遗忘曲线</button>
+    <button class="btn adv" id="todaybtn" title="只看最近 24 小时">今天</button>
+    <button class="btn adv" data-kind="image"><i class="dot" style="background:#ffc46a"></i>图</button>
+    <button class="btn adv" data-kind="text"><i class="dot" style="background:#7fdcff"></i>文</button>
+    <button class="btn adv" data-kind="memory"><i class="dot" style="background:#c08cff"></i>忆</button>
+    <button class="btn adv" id="rvbtn" title="待复看：一次给你十几颗快忘掉的记忆，逐颗决定留还是隐">待复看</button>
+    <button class="btn adv" id="posterbtn" title="把此刻这片海存成一张竖版星图">星图</button>
+    <button class="btn" id="mgbtn" title="整理：列表式浏览、批量收藏/隐去/打标签、看这堆记忆的体检">整理</button>
+    <button class="btn" id="morebtn" title="更多">⋯</button>
+  </div>
+</div>
+
+<div id="mgmt">
+  <div class="mgh">
+    <span class="mgt">整理 · 全部记忆</span>
+    <input id="mgq" placeholder="搜内容 / 会话 / 标签 / 备注…">
+    <button class="mgio" id="mgtrash" title="隐去 / 归档的都在这里，能收回来">回收站</button>
+    <button class="mgio" id="mgclean" title="几条能一把清掉噪音的规则，先看清影响多少条再决定">清理…</button>
+    <button class="mgio" id="mgexp" title="把收藏 / 标签 / 备注 / 隐去 / 归档导出成一个文件，换机器也能带走">导出</button>
+    <button class="mgio" id="mgimp" title="从之前导出的文件恢复">导入</button>
+    <span class="mgc" id="mgcount"></span>
+    <b class="mgx" id="mgclose" title="收起">✕</b>
+  </div>
+  <div class="mgr">
+    <button class="mgtab on" data-mgtab="list">清单</button>
+    <button class="mgtab" data-mgtab="health">体检</button>
+    <button class="mgtab" data-mgtab="review">回顾</button>
+    <span class="mgsp"></span>
+    <select id="mgsort">
+      <option value="t">时间 · 新→旧</option>
+      <option value="to">时间 · 旧→新</option>
+      <option value="s">按会话</option>
+    </select>
+    <label class="mgck"><input type="checkbox" id="mgstar"> 只看收藏</label>
+    <label class="mgck"><input type="checkbox" id="mghide"> 看隐去的</label>
+  </div>
+  <div class="mghint2" id="mgtabhint"></div>
+  <div class="mgfilter" id="mgfilter"></div>
+  <div class="mgb" id="mgbody"></div>
+  <div class="mgf" id="mgfoot"></div>
+</div>
+
+<div id="srcpanel">
+  <div class="sph"><span>来源 · 谁说的话上星</span><b id="spclose" title="收起">✕</b></div>
+  <div id="spbody"></div>
+</div>
+
+<div class="hud" id="sessions">
+  <div class="hd" id="sesshead">会话 · SESSIONS</div>
+  <div id="sesslist"></div>
+</div>
+
+<div id="today">
+  <div class="thd">
+    <span>今天</span><span>最近 24 小时</span><b id="tcnt">0</b><span>条</span>
+    <span class="tcl" id="tclose">收起 ✕</span>
+  </div>
+  <div id="tstrip"></div>
+</div>
+
+<div class="hud" id="timeline">
+  <div id="tlbar"><canvas id="tlcanvas"></canvas></div>
+  <div class="tllabel" id="tlfrom" style="left:0"></div>
+  <div class="tllabel" id="tlto" style="right:0"></div>
+</div>
+
+<div id="hint">左键拖移 · 右键转视角 · 滚轮缩放 · Shift+拖拽框选 · 点击任意一颗星，潜入那段记忆</div>
+
+<div id="review">
+  <span class="cnt" id="rvCnt">待复看</span>
+  <button id="rvKeep">留着</button>
+  <button id="rvHide">隐去</button>
+  <button id="rvTag">打标签</button>
+  <button id="rvStop">结束</button>
+</div>
+
+<div id="bulk">
+  <span class="cnt" id="bulkCnt">已选 0 颗</span>
+  <button id="bkStar">收藏</button>
+  <button id="bkHide">隐去</button>
+  <button id="bkTag">加标签</button>
+  <button id="bkClear">取消</button>
+</div>
+
+<aside id="detail">
+  <div class="top">
+    <span class="tag" id="dkind">MEMORY</span>
+    <div class="dtools">
+      <button class="ic" id="dstar" title="收藏这颗记忆">☆</button>
+      <button class="ic" id="dhide" title="从海里隐去">隐</button>
+      <button class="ic" id="dclose" title="关闭">✕</button>
+    </div>
+  </div>
+  <div id="dbody">
+    <img id="dimg" alt="" style="display:none">
+    <div id="dmeta"></div>
+    <div id="dreveal" style="display:none"></div>
+    <div id="dtext"></div>
+    <!-- 「前后关系」和「相关话语」紧跟在正文后面：它们是最常被要看的两样，
+         原来排在标签、备注下面，正文一长就得滚很久才能看到。 -->
+    <div id="drel" style="display:none">
+      <div class="t" id="dreltitle">这段对话里，前后几条</div>
+      <div id="drelist"></div>
+    </div>
+    <div id="dxrel" style="display:none">
+      <div class="t">这件事，别处也提过</div>
+      <div id="dxlist"></div>
+    </div>
+    <div id="dtags"></div>
+    <div id="dtagWrap">
+      <div class="tagt">标签 <span class="tiph">回车确认 · 点自动词可以收成标签</span></div>
+      <div class="taglist" id="dtagList"></div>
+      <input id="dtagIn" placeholder="加一个标签（人 / 项目 / 心情…）">
+    </div>
+    <div id="dnoteWrap">
+      <textarea id="dnote" rows="2" placeholder="写一句备忘，只存在你自己的浏览器里…"></textarea>
+      <div class="nfoot"><span id="dnoteState"></span><span class="hintk">⌘/Ctrl + Enter 保存</span></div>
+    </div>
+  </div>
+</aside>
+
+<aside id="shelf">
+  <div class="top">
+    <span class="tag" id="shtitle">我的收藏</span>
+    <div class="acts">
+      <button class="mini" id="shexport" title="把收藏/隐去/备注/归档导出成一个文件">导出</button>
+      <button class="mini" id="shimport" title="从之前导出的文件恢复">导入</button>
+      <button class="ic" id="shclose">✕</button>
+    </div>
+  </div>
+  <div id="shbody"></div>
+  <input type="file" id="shfile" accept=".json,application/json" hidden>
+</aside>
+
+<div id="tour">
+  <div id="tspot"></div>
+  <div id="tcard">
+    <div class="tstep" id="tstep">1 / 4</div>
+    <h4 id="ttitle"></h4>
+    <p id="ttext"></p>
+    <div class="tfoot">
+      <button class="btn tskip" id="tskip">跳过</button>
+      <button class="btn" id="tprev">上一步</button>
+      <button class="btn tgo" id="tnext">下一步</button>
+    </div>
+  </div>
+</div>
+
+<div id="guide">
+  <div class="gcard">
+    <div class="ghead">
+      <b>这片海怎么看</b>
+      <button class="ic" id="guideX">✕</button>
+    </div>
+    <div class="gbody">
+      <div class="gsec">
+        <h4>三种问法，按你还记得的东西挑</h4>
+        <p>· 记得<b>一句话</b> → 上面搜索框，输任意几个字<br>
+           · 记得<b>大概什么时候</b> → 标题下面「今天 / 最近 7 天 / 最近 30 天」，点了直接出那一段的回顾<br>
+           · 记得<b>在哪个对话里</b> → 左栏点那一段，属于它的星会亮起来</p>
+      </div>
+      <div class="gsec">
+        <h4>一颗星 = 一句话</h4>
+        <p>谁说的看颜色：<i class="sw wrk"></i>我的回复、<i class="sw cmp"></i>你说的话、QQ、团队协作、世界日记…<br>
+           星越大＝这条反复提过；外面的<b>虚线圈</b>＝被标成了长期记忆；越亮＝越近，暗下去的是正在变远的。</p>
+      </div>
+      <div class="gsec">
+        <h4>点开一颗星</h4>
+        <p>右边出全文、标签、备注。下面还会列出两组：<br>
+           <b>这件事，别处也提过</b> —— 别的对话里说得像的几条，点一下跳过去<br>
+           <b>这段对话里，前后几条</b> —— 把这句话放回上下文<br>
+           键盘 <b>← →</b> 在相邻的星之间走，<b>Esc</b> 一层层退。</p>
+      </div>
+      <div class="gsec">
+        <h4>整理：星图不适合动手</h4>
+        <p>右上角<b>整理</b>是另一种看法 —— 一条一行、能搜、能排序、能按会话折叠、能多选，
+           整批收藏 / 隐去 / 打标签。<br>
+           旁边<b>体检</b>把这堆记忆的状态摊成数字，<b>每张卡都能点</b>：点「重复」就只看重复的那些。<br>
+           <b>回顾</b>选一段时间出一张卡：那几天什么样、哪句后来再没提过、发过哪些图。</p>
+      </div>
+      <div class="gsec">
+        <h4>带走</h4>
+        <p>整理页顶上的<b>导出</b>：收藏 / 标签 / 备注 / 隐去 / 归档存成一个文件，换机器点<b>导入</b>就回来了。<br>
+           记忆本体在 <code>.dsh</code> 里，重装后跑一条 <code>node sea-build/setup.mjs</code> 就重建，不用备份。</p>
+      </div>
+      <div class="gsec">
+        <h4>看不到某些东西？</h4>
+        <p>① 右上<b>来源</b>：把去掉勾的来源勾回来<br>
+           ② 右上<b>近岸 / 远洋</b>：换一层<br>
+           ③ 被隐去的：「整理」里勾上「看隐去的」</p>
+      </div>
+      <div class="gsec">
+        <h4>给 AI 用</h4>
+        <p>这个插件也给 AI 开了几个工具：按关键词回忆、回顾某一天、找某段对话、标星。
+           所以可以直接问 AI「我们之前是不是聊过 X」。</p>
+      </div>
+      <div class="gsec">
+        <h4>手怎么用</h4>
+        <p>左键拖＝移动　右键拖＝转视角　滚轮＝缩放　<b>Shift + 拖</b>＝框选一批<br>
+           顶栏那四个「换一种看法」（往后看 / 重叠 / 年轮 / 情绪）都是临时换个角度，再点一次回来。</p>
+      </div>
+    </div>
+    <div class="gfoot">
+      <button class="btn" id="guideOk">知道了，去看看</button>
+    </div>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="lgrow"><i class="lgs wrk"></i>工作海<i class="lgs cmp"></i>陪伴海</div>
+  <div class="lgrow"><i class="lgb"></i>越大＝提得越多 <i class="lgring"></i>虚圈＝长期记忆</div>
+  <div class="lgrow"><i class="lgd"></i>亮＝近 <i class="lgd dim"></i>暗＝远</div>
+</div>
+
+<aside id="results">
+  <div class="top">
+    <span class="tag" id="rtitle">检索结果</span>
+    <button id="rclose">✕</button>
+  </div>
+  <div id="rlist"></div>
+</aside>
+
+<div id="tip">
+  <img id="tipimg" alt="" style="display:none">
+  <div class="tt" id="tiptext"></div>
+  <div class="tm" id="tiptime"></div>
+</div>
+
+<script src="data.js"></script>
+<script src="sc-data.js"></script>
+  <script src="bridge.js"></script>
+<script src="version.js"></script>
+<script>
+/*@@JS@@*/
+</script>
+<div id="ringNote" class="folded">
+  <div class="rh">年轮 · 怎么看<span class="fl">▾</span></div>
+  <ul>
+    <li><b>圆心是「现在」</b>，往外每一条细圈 = <b id="ringStep">7</b> 天，圈上写着那天的日期。</li>
+    <li>同一个方向上，<b>越靠外的星越老</b> —— 顺着一条射线往外看，就是同一类事怎么从新鲜变成旧的。</li>
+    <li>星的颜色还是那片海的颜色；<b>深浅</b>是这条还记得多牢。</li>
+    <li>右键拖＝转视角、左键拖＝移动、滚轮＝放大，点一颗星看它到底是什么。</li>
+  </ul>
+  <div class="rf">再点一次「年轮」回到星图</div>
+</div>
+
+<div id="pv">
+  <div class="pvbox">
+    <img id="pvimg" alt="星图">
+    <div class="pvbar">
+      <span class="pvt">右键图片也能直接存</span>
+      <button id="pvdl" class="pvb">保存 PNG</button>
+      <button id="pvx" class="pvb ghost">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="fut" hidden>
+  <div class="frow">
+    <span class="fh">往后看</span>
+    <b id="futN">+30 天</b>
+    <input type="range" id="futR" min="0" max="365" step="1" value="30">
+    <button id="futX" title="回到现在">×</button>
+  </div>
+  <div class="fs" id="futS">她按遗忘规则往下走：重要的留住，不重要的慢慢没了</div>
+</div>
+<a id="newver" href="#" hidden>海更新了 · 点这里看新版</a>
+</body>
+</html>
