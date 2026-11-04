@@ -1023,7 +1023,24 @@ function resolveRoot(configRoot) {
   return persistent;
 }
 
-export async function apply(ctx, config) {
+// 懒加载 @deepseek-ai/dsh-llm：apply 必须是同步的。
+// 如果 apply 返回 Promise，Cordis 会认为插件还没 ready，
+// agent 创建时读不到工具表 → 工具注册了但模型永远看不到。
+let _cum = null;
+let _cumTried = false;
+async function getCreateUserMessage() {
+  if (_cumTried) return _cum;
+  _cumTried = true;
+  try {
+    const m = await import('@deepseek-ai/dsh-llm');
+    _cum = typeof m.createUserMessage === 'function' ? m.createUserMessage : null;
+  } catch (e) {
+    console.warn('[sea] 拿不到 @deepseek-ai/dsh-llm，AI 触发提示没装上（工具照常）：' + (e?.message || e));
+  }
+  return _cum;
+}
+
+export function apply(ctx, config) {
   const root = resolveRoot(config?.root);
   const prefix = String(config?.prefix || '/sea');
   const reader = makeDataReader(root);
@@ -1250,13 +1267,6 @@ export async function apply(ctx, config) {
   // 这是本插件有没有使用价值的关键：工具能查 ≠ 模型会去查。
   if (config?.trigger !== false) {
     try {
-      let createUserMessage = null;
-      try {
-        ({ createUserMessage } = await import('@deepseek-ai/dsh-llm'));
-      } catch (e) {
-        console.warn('[sea] 拿不到 @deepseek-ai/dsh-llm，AI 触发提示没装上（工具照常）：' + (e?.message || e));
-      }
-      if (typeof createUserMessage === 'function') {
         // 第 1 轮：完整说明（工具清单 + 什么时候用）
         const FULL = [
           '<system-reminder>',
@@ -1297,6 +1307,8 @@ export async function apply(ctx, config) {
             const decision = await next();
             if (!decision || decision.kind === 'reject' || signal?.aborted) return decision;
             if (step !== 1) return decision;
+            const createUserMessage = await getCreateUserMessage();
+            if (typeof createUserMessage !== 'function') return decision;
             const msgs = Array.isArray(decision.messages) ? decision.messages : [];
             let last = '';
             for (let i = msgs.length - 1; i >= 0; i--) {
@@ -1331,7 +1343,6 @@ export async function apply(ctx, config) {
           { prepend: true }
         );
         if (typeof off === 'function') offs.push(off);
-      }
     } catch (e) {
       console.warn('[sea] AI 触发提示没装上（工具照常）：' + (e?.message || e));
     }
