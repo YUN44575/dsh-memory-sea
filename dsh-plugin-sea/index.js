@@ -1243,6 +1243,100 @@ export async function apply(ctx, config) {
     console.warn('[sea] ctx.tools 不在，记忆工具没挂上（静态服务照常）');
   }
 
+
+// ── 触发：让 AI 真的会去用这些工具（不然工具挂在那儿，模型不会想起来）
+  // 每轮第一个 step 附一行提醒；会话第一轮换成完整说明；用户话里出现
+  // 「上次 / 之前 / 那天 / 还记得」时再加一句「先查再说」。
+  // 这是本插件有没有使用价值的关键：工具能查 ≠ 模型会去查。
+  if (config?.trigger !== false) {
+    try {
+      let createUserMessage = null;
+      try {
+        ({ createUserMessage } = await import('@deepseek-ai/dsh-llm'));
+      } catch (e) {
+        console.warn('[sea] 拿不到 @deepseek-ai/dsh-llm，AI 触发提示没装上（工具照常）：' + (e?.message || e));
+      }
+      if (typeof createUserMessage === 'function') {
+        // 第 1 轮：完整说明（工具清单 + 什么时候用）
+        const FULL = [
+          '<system-reminder>',
+          '你有「记忆意识海」的工具，能查到自己聊过的**真实原话**：',
+          '· sea_recall —— 按关键词/来源/时间翻原话（你说的、我说的、QQ、团队协作、世界日记），返回带日期和所在对话',
+          '· sea_day —— 看某一天发生了什么',
+          '· sea_sessions —— 找是哪段对话',
+          '· sea_mark —— 标星/打标签/写备注（**只在用户明确要求时才用**）',
+          '用户提到过去的事，或要引用原话、核对数字/约定/名字而你不确定时，**先用 sea_recall 查，不要凭印象编**。',
+          '</system-reminder>',
+        ].join('\n');
+        // 之后每轮：一行提醒（历史消息可能被上下文压缩折掉，所以要重复）
+        const SHORT = [
+          '<system-reminder>',
+          '要引用过去的原话、核对数字/约定/名字而你不确定时，先用 sea_recall 查，不要凭印象编。',
+          '</system-reminder>',
+        ].join('\n');
+        const TRIGGER = [
+          '<system-reminder>',
+          '这句话可能在问过去的事。回答前先调 sea_recall 查一下真实原话（拿这句话里的关键词搜），再按查到的东西说。',
+          '</system-reminder>',
+        ].join('\n');
+        const WORD_RE = /上次|上回|之前|以前|那天|当时|还记得|记不记得|前几天|去年|早些时候|聊过|提过|说过/;
+        const textOf = (m) => {
+          const c = m && m.content;
+          if (typeof c === 'string') return c;
+          if (Array.isArray(c)) {
+            return c
+              .filter((x) => x && x.type === 'text' && typeof x.text === 'string')
+              .map((x) => x.text)
+              .join('\n');
+          }
+          return '';
+        };
+        const off = ctx.on(
+          'agent/pre-step',
+          async ({ turn, step, signal }, next) => {
+            const decision = await next();
+            if (!decision || decision.kind === 'reject' || signal?.aborted) return decision;
+            if (step !== 1) return decision;
+            const msgs = Array.isArray(decision.messages) ? decision.messages : [];
+            let last = '';
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i] && msgs[i].role === 'user') {
+                last = textOf(msgs[i]);
+                break;
+              }
+            }
+            const first = turn === 1;
+            const hit = last ? WORD_RE.test(last) : false;
+            const base = first ? FULL : SHORT;
+            const text = hit ? base + '\n' + TRIGGER : base;
+            try {
+              return {
+                kind: 'enter',
+                messages: msgs.concat([
+                  createUserMessage({
+                    content: [{ type: 'text', text }],
+                    source: {
+                      kind: 'plugin:dsh-memory-sea',
+                      form: 'snapshot',
+                      sections: [{ name: 'memory-sea-trigger', text }],
+                    },
+                  }),
+                ]),
+              };
+            } catch (e) {
+              console.warn('[sea] 注入提示失败（不影响回答）：' + (e?.message || e));
+              return decision;
+            }
+          },
+          { prepend: true }
+        );
+        if (typeof off === 'function') offs.push(off);
+      }
+    } catch (e) {
+      console.warn('[sea] AI 触发提示没装上（工具照常）：' + (e?.message || e));
+    }
+  }
+
   return () => {
     for (const off of offs) {
       try { off(); } catch {}
